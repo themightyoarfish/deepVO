@@ -1,6 +1,8 @@
 import tensorflow as tf
 from math import ceil
 from tensorflow.contrib.rnn import *
+import numpy as np
+from helper import conversions
 
 class VOModel(object):
 
@@ -94,3 +96,69 @@ class VOModel(object):
                                           self.cell_state: initial_state.c,
                                           self.sequence_length: sequence_length})
 
+
+def train():
+    print("hdaodwa")
+    #model = VOModel((1280,680,3),2,2)
+    poses = np.load('data/poses.npy')
+    images = np.load('data/images.npy')
+
+
+    poses_xyzrpy = conversions.posesFromQuaternionToRPY(poses)
+    
+    N = images.shape[0]
+    H = images.shape[1]
+    W = images.shape[2]
+    C = images.shape[3]
+
+    print(images.shape)
+    
+    batch_size = 100
+
+   
+    batch_indices = np.arange(batch_size+1)
+    
+    image_stack_batch = np.zeros([batch_size,H,W,C*2])    
+
+
+    for batch_idx in range(0,N,batch_size+1):
+        # creating batch
+        
+        # TODO: better
+        if batch_idx + batch_size + 1 > N:
+            break
+
+        image_indices_global = batch_indices + batch_idx
+
+        image_stack_batch[ batch_indices[:-1] ] = np.concatenate(
+                (images[image_indices_global[:-1] ], images[image_indices_global[1:] ]),
+                axis=-1)
+
+        # image_stack_batch.shape = (batch_size, H, W, C*2)
+        # do something with stack batch
+
+        print(image_stack_batch.shape)
+
+
+def evaluate():
+    print("evalll")
+
+if __name__ == "__main__":
+    import sys
+
+    function_dict = {
+                'train':train,
+                'eval':evaluate
+            }
+
+    if len(sys.argv) > 1:
+        cmdline_arg = sys.argv[1]
+        #print(cmdline_arg)
+        if cmdline_arg in function_dict:
+            function_dict[cmdline_arg]()
+            print('finished')
+        else:
+            print(cmdline_arg + ' is not implemented ' )
+
+    else:
+        print(sys.argv[0] + ' train|eval')
