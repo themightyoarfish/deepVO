@@ -4,6 +4,8 @@ from tensorflow.contrib.rnn import *
 import numpy as np
 from helper import conversions
 
+from helper import data_manager
+
 class VOModel(object):
 
     '''Model class of the RCNN for visual odometry.'''
@@ -98,46 +100,24 @@ class VOModel(object):
 
 
 def train():
-    print("hdaodwa")
+    print("Training of VOModel...")
     #model = VOModel((1280,680,3),2,2)
     poses = np.load('data/poses.npy')
     images = np.load('data/images.npy')
 
+    dm = data_manager.DataManager(
+            path_to_images = 'data/images.npy',
+            path_to_poses = 'data/poses.npy',
+            batch_size = 100,
+            seq_len = 2
+        )
 
-    poses_xyzrpy = conversions.posesFromQuaternionToRPY(poses)
-    
-    N = images.shape[0]
-    H = images.shape[1]
-    W = images.shape[2]
-    C = images.shape[3]
+    # maybe better to lern angular instead of quaternions?
+    if dm.poseContainsQuaternion():
+        dm.convertPosesToRPY()
 
-    print(images.shape)
-    
-    batch_size = 100
-
-   
-    batch_indices = np.arange(batch_size+1)
-    
-    image_stack_batch = np.zeros([batch_size,H,W,C*2])    
-
-
-    for batch_idx in range(0,N,batch_size+1):
-        # creating batch
-        
-        # TODO: better
-        if batch_idx + batch_size + 1 > N:
-            break
-
-        image_indices_global = batch_indices + batch_idx
-
-        image_stack_batch[ batch_indices[:-1] ] = np.concatenate(
-                (images[image_indices_global[:-1] ], images[image_indices_global[1:] ]),
-                axis=-1)
-
-        # image_stack_batch.shape = (batch_size, H, W, C*2)
-        # do something with stack batch
-
-        print(image_stack_batch.shape)
+    for batch in dm.batches():
+        print(batch.shape)
 
 
 def evaluate():
