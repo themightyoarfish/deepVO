@@ -1,4 +1,5 @@
 import numpy as np
+from matplotlib import pyplot as plt
 
 # q = x,y,z,w
 # return [roll,pitch,yaw]
@@ -169,6 +170,7 @@ class DataManager(object):
         self.sequence_length = seq_len
         self.poses      = np.load(path_to_poses)
         self.images     = np.load(path_to_images)
+
         self.seq_len    = 2
         self.batch_size = batch_size
         # additional frames needed depending on sequence length
@@ -197,6 +199,19 @@ class DataManager(object):
 
     def convertPosesToRPY(self):
         self.poses = posesFromQuaternionToRPY(self.poses)
+
+    def numData():
+        return self.N
+
+    def storeDataToFileSystem(self, folder):
+        for i in range(0,self.images.shape[0]):
+            image = self.images[i]
+            image_filename = '/images/image%05d.npy' % i
+            np.save(folder + image_filename, image)
+            pose = self.poses[i]
+            pose_filename = '/poses/pose%05d.npy' % i
+            np.save(folder + pose_filename, pose)
+
 
     def batches(self):
 
@@ -272,3 +287,118 @@ class DataManager(object):
 
             yield batch_images, batch_poses
 
+import os, os.path
+
+class DataManager2(object):
+    def __init__(self,
+                 dataset_path='data/dataset1/',
+                 batch_size=10,
+                 seq_len=10,
+                 debug=False,
+                 dtype='uint8'
+                 ):
+
+        self.dtype = dtype
+        self.debug = debug
+        self.dataset_path = dataset_path
+        self.images_path = dataset_path + 'images/'
+        self.poses_path = dataset_path + 'poses/'
+
+        image_files = os.listdir(self.images_path)
+        self.N = len( image_files )
+
+        self.num_dec_file = sum(c.isdigit() for c in image_files[0] )
+
+        self.image_file_template = (self.images_path + 'image%0'+str(self.num_dec_file)+'d.npy')
+        self.pose_file_template = (self.poses_path + 'pose%0'+str(self.num_dec_file)+'d.npy')
+
+        init_image = self.__loadImage(0)
+
+        self.H = init_image.shape[0]
+        self.W = init_image.shape[1]
+        self.C = init_image.shape[2]
+
+
+        self.sequence_length = seq_len
+
+        self.seq_len    = 2
+        self.batch_size = batch_size
+        # additional frames needed depending on sequence length
+        self.add_frames = self.seq_len - 1
+
+        self.batch_images = np.empty(
+            [self.batch_size, self.sequence_length, self.H, self.W, self.C * self.seq_len],
+            dtype = dtype
+        )
+
+        self.batch_poses = np.empty(
+            [self.batch_size, self.sequence_length, 6]
+        )
+
+        if(self.debug):
+            print("Datamanager Found " + str(self.N) + " images and poses in dataset." )
+            print("Image shape: ")
+            print( self.getImageShape() )
+
+
+    def getImageShape(self):
+        return (self.H, self.W, self.C)
+
+    def numData():
+        return self.N
+
+    def batches(self, diff_poses = False):
+        # 1D length of batch_size times sequence length
+        chunk_size = self.batch_size * self.sequence_length
+        chunk_count = 0
+        for chunk_point in range(self.sequence_length+1, self.N, chunk_size):
+            seq_count = 0
+            for seq_point in range(chunk_point, chunk_point+chunk_size, self.sequence_length):
+                # print("chunk: " + str(chunk_point) + ", image_id: " + str(seq_point) )
+
+                if seq_point >= self.N:
+                    return
+
+                image_indices = np.arange(seq_point-self.sequence_length-1, seq_point)
+
+                # generate sequences
+                images = self.__loadImages(image_indices)
+                poses = self.__loadPoses(image_indices)
+
+                self.batch_images[seq_count,...,0:3] = images[:-1]
+                self.batch_images[seq_count,...,3:7] = images[1:]
+
+                # generate diff poses
+                if diff_poses:
+                    self.batch_poses[seq_count,...] = poses[1:] - poses[:-1]
+                else:
+                    self.batch_poses[seq_count,...] = poses[1:]
+                seq_count = seq_count + 1
+
+                # generate sequence and add it to batch
+            chunk_count = chunk_count + 1
+
+            yield self.batch_images, self.batch_poses
+
+    def __loadImage(self, id):
+        return np.load( self.image_file_template % id)
+
+
+    def __loadImages(self, ids):
+        num_images = len(ids)
+        images = np.empty([num_images, self.H, self.W, self.C], dtype=self.dtype)
+        for i in range(0, num_images):
+            # right colors:
+            images[i] = np.load( self.image_file_template % i)
+
+        return images
+
+    def __loadPose(self, id):
+        return np.load(self.pose_file_template % id)
+
+    def __loadPoses(self, ids):
+        num_poses = len(ids)
+        poses = np.empty([num_poses, 6])
+        for i in range(0, num_poses):
+            poses[i] = np.load( self.pose_file_template % i)
+        return poses
