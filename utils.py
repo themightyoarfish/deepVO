@@ -1,5 +1,45 @@
 import numpy as np
 
+# q = x,y,z,w
+# return [roll,pitch,yaw]
+def toEulerAngles(q):
+    '''Convert quaternion to euler angles
+
+    Parameters
+    ----------
+    q   :   np.array or list
+
+    Returns
+    -------
+    np.ndarray
+        Array of 3 elements [roll, pitch, yaw]
+    '''
+    sinr = 2.0 * (q[3] * q[0] + q[1] * q[2])
+    cosr = 1.0 - 2.0 * (q[0] * q[0] + q[1] * q[1] )
+    roll = np.arctan2(sinr, cosr)
+    sinp = 2.0 * (q[3] * q[1]  - q[2] * q[0] )
+
+    if(np.abs(sinp) >= 1):
+        pitch = np.copysign(np.pi / 2.0, sinp)
+    else:
+        pitch = np.arcsin(sinp)
+
+    siny = 2.0 * (q[3] * q[0] + q[0] * q[1] )
+    cosy = 1.0 - 2.0 * (q[1] * q[1] + q[2] * q[2] )
+    yaw = np.arctan2(siny, cosy)
+    return np.array([roll, pitch, yaw])
+
+def posesFromQuaternionToRPY(poses):
+    '''Batch-convert a set of poses from quaternions to euler angles.'''
+    poses_xyzrpy = []
+    for i in range(0,len(poses)):
+        pose = np.zeros(6)
+        pose[0:3] = poses[i,0:3]
+        pose[3:6] = toEulerAngles(poses[i,3:7])
+        poses_xyzrpy.append(pose)
+
+    return np.array(poses_xyzrpy)
+
 
 def resize_to_multiple(images, multiples):
     '''Resize a batch of images in the height and width dimensions so their size are an integer
@@ -11,6 +51,11 @@ def resize_to_multiple(images, multiples):
                 Tensor of shape [batch, height, width, channels]
     multiples   :   int or tuple
                     The value/s that should evenly divide the resized image's dimensions
+
+    Returns
+    -------
+    tf.op
+        Tensorflow op for resizing images
     '''
     from tensorflow.image import resize_images
     _, h, w, _ = images.get_shape()
@@ -22,56 +67,95 @@ def resize_to_multiple(images, multiples):
     return resize_images(images, [new_h, new_w])
 
 
-def image_pairs(image_sequence, batch_size):
-    '''Generate stacked pairs of images where two 3-channel images are merged to on 6-channel image
+def image_pairs(image_sequence, sequence_length):
+    '''Generate sequences of stacked pairs of images where two 3-channel images are merged to on
+    6-channel image. If the image sequence length is not evenly divided by the sequence length,
+    fewer than the total number of images will be yielded.
+
 
     Parameters
     ----------
     image_sequence  :   np.ndarray
                         Array of shape (num, h, w, 3)
-    batch_size  :   int
-                    Number of elements (6-channel imgs) yielded each time
+    sequence_length  :  int
+                        Number of elements (6-channel imgs) yielded each time
 
     Returns
     -------
     np.ndarray
-        Array of shape (batch_size, h, w, 6)
+        Array of shape (sequence_length, h, w, 6)
     '''
     N, h, w, c = image_sequence.shape
-    for idx in range(0, N, batch_size):
-        indices = np.empty(batch_size * 2, dtype=np.uint8)
-        batch_indices = np.arange(batch_size) + idx
-        indices[0::2] = batch_indices
-        indices[1::2] = batch_indices + 1
+    for idx in range(0, N, sequence_length):
+        stacked_indices = np.empty((sequence_length - 1) * 2, dtype=np.uint8)
+        batch_indices = np.arange(sequence_length - 1) + idx
+        stacked_indices[0::2] = batch_indices
+        stacked_indices[1::2] = batch_indices + 1
         # stacked is [img0, img1, img1, img2, img2, img3, ...]
-        # stacked.shape = (batch_size * 2, h, w, c)
-        stacked = image_sequence[indices, ...]
+        # stacked.shape = (sequence_length * 2, h, w, c)
+        stacked = image_sequence[stacked_indices, ...]
 
         # return array stacks every 2 images together and thus has 6 channels per image, each image
         # appears twice
-        ret = np.empty((batch_size, h, w, 2 * c), dtype=stacked.dtype)
+        ret = np.empty((sequence_length, h, w, 2 * c), dtype=stacked.dtype)
 
-        indices = np.arange(0, batch_size - 1)
+        indices = np.arange(0, sequence_length - 1)
         ret[indices, ..., 0:3] = stacked[indices * 2]
         ret[indices, ..., 3:6] = stacked[indices * 2 + 1]
+
+        assert (ret[0, ..., :3] == image_sequence[0]).all()
+        assert (ret[0, ..., 3:] == image_sequence[1]).all()
 
         yield ret
 
 
 def subtract_mean_rgb(image_sequence):
+    '''Subtract the rgb mean in-place. The mean is computed and subtracted on each channel. The mean
+    is computed and subtracted on each channel.
+
+    Parameters
+    ----------
+    image_sequence  :   np.ndarray
+                        Array of shape (N, h, w, c)
+    '''
     N, h, w, c = image_sequence.shape
     # compute mean separately for each channel
-    mode = image_sequence.mean((0, 1, 2)).astype(np.uint8)
+    # somehow this expression is buggy, so we must do it manually
+    # mode = image_sequence.mean((0, 1, 2)).astype(image_sequence.dtype)
+    mean_r = image_sequence[..., 0].mean()
+    mean_g = image_sequence[..., 1].mean()
+    mean_b = image_sequence[..., 2].mean()
+
+    # in order to make sure the subtraction is properly applied to each channel, we help the
+    # broadcasting process by making it an array of shape (1, 1, 1, 3)
+    mode = np.array([mean_r, mean_g, mean_b])
+    mode = mode[np.newaxis, np.newaxis, np.newaxis, ...]
+
     np.subtract(image_sequence, mode, out=image_sequence)
 
 
-def convert_large_array(file_in, file_out, dtype):
+def convert_large_array(file_in, file_out, dtype, factor=1.0):
+    '''Convert data type of an array possibly too large to fit in memory.
+    This uses memory-mapped files and will therefore be very slow.
+
+    Parameters
+    ----------
+    file_in :   str
+                Name of the input file
+    file_out    :   str
+                    Name of the output file
+    dtype   :   np.dtype
+                Destination data type
+    factor  :   float
+                Scaling factor to apply to all elements
+    '''
     source = np.lib.format.open_memmap(file_in, mode='r')
     dest = np.lib.format.open_memmap(file_out, mode='w+', dtype=dtype, shape=source.shape)
     np.copyto(dest, source, casting='unsafe')
+    if factor != 1.0:
+        np.multiply(dest, factor, out=dest)
 
 
-import conversions
 import numpy as np
 
 class DataManager(object):
@@ -112,7 +196,7 @@ class DataManager(object):
         return self.poses.shape[1] == 7
 
     def convertPosesToRPY(self):
-        self.poses = conversions.posesFromQuaternionToRPY(self.poses)
+        self.poses = posesFromQuaternionToRPY(self.poses)
 
     def batches(self):
 
