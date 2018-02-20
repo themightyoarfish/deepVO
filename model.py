@@ -11,12 +11,16 @@ class VOModel(object):
         Parameters
         ----------
         image_shape :   tuple
+        memory_size :   int
+                        LSTM state size
+        sequence_length :   int
+                            Length of the video stream
         '''
 
         with tf.name_scope('inputs'):
             h, w, c = image_shape
             # TODO: Resize images before stacking. Maybe do that outside of the graph?
-            self.input_images = tf.placeholder(tf.uint8, shape=[None, sequence_length, h, w, 2 * c],
+            self.input_images = tf.placeholder(tf.float32, shape=[None, sequence_length, h, w, 2 * c],
                                                name='imgs')
             self.target_poses = tf.placeholder(tf.float32, shape=[None, sequence_length, 6],
                                                name='poses')
