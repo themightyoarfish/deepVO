@@ -31,7 +31,7 @@ def main():
     with tf.Session() as session:
         for images, labels in dm.batchesWithSequences():
             session.run(tf.global_variables_initializer())
-            model.get_cnn_output(session, images, labels)
+            model.get_rnn_output(session, images, labels)
 
 
 if __name__ == '__main__':
