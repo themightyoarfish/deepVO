@@ -96,7 +96,7 @@ class VOModel(object):
                     output = tf.layers.conv2d(output,
                                               channels,
                                               kernel_size=[ksize, ksize],
-                                              strides=[stride, stride],
+                                              strides=stride,
                                               padding='SAME',
                                               activation=activation,
                                               kernel_initializer=kernel_initializer(ksize),
