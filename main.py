@@ -1,8 +1,11 @@
 import sys
 import numpy as np
+from argparse import ArgumentParser
 
 from model import VOModel
 import tensorflow as tf
+
+from utils import DataManager
 
 
 def main():
@@ -19,9 +22,21 @@ def main():
     memory_size = 1000
     sequence_length = 10
 
-    model = VOModel(image_shape, memory_size, sequence_length)
-    with tf.Session() as session:
-        zero_state = model.get_zero_state(session, batch_size)
+    dm = DataManager(path_to_images=args.imgs,
+                 path_to_poses=args.poses,
+                 batch_size=50,
+                 seq_len=10)
+
+    if dm.poseContainsQuaternion():
+        dm.convertPosesToRPY()
+
+    for images, labels in dm.batchesWithSequences():
+        print(images.shape)
+        print(labels.shape)
+
+    #model = VOModel(image_shape, memory_size, sequence_length, batch)
+    #with tf.Session() as session:
+    #    zero_state = model.get_zero_state(session, batch_size)
 
 
 if __name__ == "__main__":
