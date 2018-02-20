@@ -233,20 +233,13 @@ class DataManager(object):
     def batchesWithSequences(self, diff_poses = False):
 
         batch_count = 0
-
-
         chunk_size = self.batch_size * self.sequence_length
-
-
-
         batch_images = np.zeros(
                 [self.batch_size, self.sequence_length, self.H, self.W, self.C * 2]
             )
-
         batch_poses = np.zeros(
                 [self.batch_size, self.sequence_length, 6]
         )
-
         chunk_count = 0
         for chunk_point in range(self.sequence_length-1, self.N, chunk_size):
 
