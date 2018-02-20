@@ -22,53 +22,83 @@ def resize_to_multiple(images, multiples):
     return resize_images(images, [new_h, new_w])
 
 
-def image_pairs(image_sequence, batch_size):
-    '''Generate stacked pairs of images where two 3-channel images are merged to on 6-channel image
+def image_pairs(image_sequence, sequence_length):
+    '''Generate sequences of stacked pairs of images where two 3-channel images are merged to on
+    6-channel image. If the image sequence length is not evenly divided by the sequence length,
+    fewer than the total number of images will be yielded.
+
 
     Parameters
     ----------
     image_sequence  :   np.ndarray
                         Array of shape (num, h, w, 3)
-    batch_size  :   int
-                    Number of elements (6-channel imgs) yielded each time
+    sequence_length  :  int
+                        Number of elements (6-channel imgs) yielded each time
 
     Returns
     -------
     np.ndarray
-        Array of shape (batch_size, h, w, 6)
+        Array of shape (sequence_length, h, w, 6)
     '''
     N, h, w, c = image_sequence.shape
-    for idx in range(0, N, batch_size):
-        indices = np.empty(batch_size * 2, dtype=np.uint8)
-        batch_indices = np.arange(batch_size) + idx
-        indices[0::2] = batch_indices
-        indices[1::2] = batch_indices + 1
+    for idx in range(0, N, sequence_length):
+        stacked_indices = np.empty((sequence_length - 1) * 2, dtype=np.uint8)
+        batch_indices = np.arange(sequence_length - 1) + idx
+        stacked_indices[0::2] = batch_indices
+        stacked_indices[1::2] = batch_indices + 1
         # stacked is [img0, img1, img1, img2, img2, img3, ...]
-        # stacked.shape = (batch_size * 2, h, w, c)
-        stacked = image_sequence[indices, ...]
+        # stacked.shape = (sequence_length * 2, h, w, c)
+        stacked = image_sequence[stacked_indices, ...]
 
         # return array stacks every 2 images together and thus has 6 channels per image, each image
         # appears twice
-        ret = np.empty((batch_size, h, w, 2 * c), dtype=stacked.dtype)
+        ret = np.empty((sequence_length, h, w, 2 * c), dtype=stacked.dtype)
 
-        indices = np.arange(0, batch_size - 1)
+        indices = np.arange(0, sequence_length - 1)
         ret[indices, ..., 0:3] = stacked[indices * 2]
         ret[indices, ..., 3:6] = stacked[indices * 2 + 1]
+
+        assert (ret[0, ..., :3] == image_sequence[0]).all()
+        assert (ret[0, ..., 3:] == image_sequence[1]).all()
 
         yield ret
 
 
 def subtract_mean_rgb(image_sequence):
+    '''Subtract the rgb mean in-place. The mean is computed and subtracted on each channel. The mean
+    is computed and subtracted on each channel.
+
+    Parameters
+    ----------
+    image_sequence  :   np.ndarray
+                        Array of shape (N, h, w, c)
+    '''
     N, h, w, c = image_sequence.shape
     # compute mean separately for each channel
-    mode = image_sequence.mean((0, 1, 2)).astype(np.uint8)
+    mode = image_sequence.mean((0, 1, 2)).astype(image_sequence.dtype)
     np.subtract(image_sequence, mode, out=image_sequence)
 
 
-def convert_large_array(file_in, file_out, dtype):
+def convert_large_array(file_in, file_out, dtype, factor=1.0):
+    '''Convert data type of an array possibly too large to fit in memory.
+    This uses memory-mapped files and will therefore be very slow.
+
+    Parameters
+    ----------
+    file_in :   str
+                Name of the input file
+    file_out    :   str
+                    Name of the output file
+    dtype   :   np.dtype
+                Destination data type
+    factor  :   float
+                Scaling factor to apply to all elements
+    '''
     source = np.lib.format.open_memmap(file_in, mode='r')
     dest = np.lib.format.open_memmap(file_out, mode='w+', dtype=dtype, shape=source.shape)
     np.copyto(dest, source, casting='unsafe')
+    if factor != 1.0:
+        np.multiply(dest, factor, out=dest)
 
 
 import conversions

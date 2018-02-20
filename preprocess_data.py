@@ -20,7 +20,7 @@ def main():
 
     if args.to_float:
         print(f'Converting {args.imgs} fo float ...')
-        convert_large_array(args.imgs, f'{args.imgs[:-4]}_float.npy', np.float32)
+        convert_large_array(args.imgs, f'{args.imgs[:-4]}_float.npy', np.float32, 1/255)
         print('Done')
 
     if args.mean_normalize:
@@ -28,15 +28,16 @@ def main():
         images = np.load(args.imgs)     # shape (N, w, h)
         print(f'Loaded {(images.size * 4) // 1000}kb of images.')
         poses = np.load(args.poses)     # shape (N, 7)
+
         if not images.shape[0] == poses.shape[0]:
             print('Different number of images and poses', file=sys.stderr)
             exit(2)
 
-        tensors = next(image_pairs(images, images.shape[0]))
-        subtract_mean_rgb(tensors)
+        subtract_mean_rgb(images)
 
-        np.save(f'{args.imgs[:-4]}_processed.npy', tensors)
+        np.save(f'{args.imgs[:-4]}_processed.npy', images)
         np.save(f'{args.poses[:-4]}_processed.npy', poses)
+        print('Done')
 
 
 if __name__ == '__main__':
