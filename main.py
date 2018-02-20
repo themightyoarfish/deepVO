@@ -7,6 +7,8 @@ from model import VOModel
 from utils import DataManager
 from utils import DataManager2
 
+from matplotlib import pyplot as plt
+
 
 def main():
     parser = ArgumentParser('Test')
@@ -42,13 +44,21 @@ def main():
 
     show_images = True
 
-    from matplotlib import pyplot as plt
+
 
 
     for i, (images, poses) in enumerate( dm.batches(diff_poses = True) ):
         print("Batch " + str(i) )
         print(images.shape)
         print(poses.shape)
+
+        # # very first image
+        # plt.imshow(images[0,0,...,0:3])
+        # plt.show()
+
+        # # last image
+        # plt.imshow(images[-1,-1,...,3:6] )
+        # plt.show()
 
 
 

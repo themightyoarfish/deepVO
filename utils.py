@@ -312,7 +312,7 @@ class DataManager2(object):
         self.image_file_template = (self.images_path + 'image%0'+str(self.num_dec_file)+'d.npy')
         self.pose_file_template = (self.poses_path + 'pose%0'+str(self.num_dec_file)+'d.npy')
 
-        init_image = self.__loadImage(0)
+        init_image = self.loadImage(0)
 
         self.H = init_image.shape[0]
         self.W = init_image.shape[1]
@@ -344,7 +344,7 @@ class DataManager2(object):
     def getImageShape(self):
         return (self.H, self.W, self.C)
 
-    def numData():
+    def numData(self):
         return self.N
 
     def batches(self, diff_poses = False):
@@ -362,8 +362,8 @@ class DataManager2(object):
                 image_indices = np.arange(seq_point-self.sequence_length-1, seq_point)
 
                 # generate sequences
-                images = self.__loadImages(image_indices)
-                poses = self.__loadPoses(image_indices)
+                images = self.loadImages(image_indices)
+                poses = self.loadPoses(image_indices)
 
                 self.batch_images[seq_count,...,0:3] = images[:-1]
                 self.batch_images[seq_count,...,3:7] = images[1:]
@@ -380,25 +380,25 @@ class DataManager2(object):
 
             yield self.batch_images, self.batch_poses
 
-    def __loadImage(self, id):
+    def loadImage(self, id):
         return np.load( self.image_file_template % id)
 
 
-    def __loadImages(self, ids):
+    def loadImages(self, ids):
         num_images = len(ids)
         images = np.empty([num_images, self.H, self.W, self.C], dtype=self.dtype)
         for i in range(0, num_images):
             # right colors:
-            images[i] = np.load( self.image_file_template % i)
+            images[i] = self.loadImage( ids[i] )
 
         return images
 
-    def __loadPose(self, id):
+    def loadPose(self, id):
         return np.load(self.pose_file_template % id)
 
-    def __loadPoses(self, ids):
+    def loadPoses(self, ids):
         num_poses = len(ids)
         poses = np.empty([num_poses, 6])
         for i in range(0, num_poses):
-            poses[i] = np.load( self.pose_file_template % i)
+            poses[i] = self.loadPose( ids[i] )
         return poses
