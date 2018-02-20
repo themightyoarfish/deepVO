@@ -1,5 +1,45 @@
 import numpy as np
 
+# q = x,y,z,w
+# return [roll,pitch,yaw]
+def toEulerAngles(q):
+    '''Convert quaternion to euler angles
+
+    Parameters
+    ----------
+    q   :   np.array or list
+
+    Returns
+    -------
+    np.ndarray
+        Array of 3 elements [roll, pitch, yaw]
+    '''
+    sinr = 2.0 * (q[3] * q[0] + q[1] * q[2])
+    cosr = 1.0 - 2.0 * (q[0] * q[0] + q[1] * q[1] )
+    roll = np.arctan2(sinr, cosr)
+    sinp = 2.0 * (q[3] * q[1]  - q[2] * q[0] )
+
+    if(np.abs(sinp) >= 1):
+        pitch = np.copysign(np.pi / 2.0, sinp)
+    else:
+        pitch = np.arcsin(sinp)
+
+    siny = 2.0 * (q[3] * q[0] + q[0] * q[1] )
+    cosy = 1.0 - 2.0 * (q[1] * q[1] + q[2] * q[2] )
+    yaw = np.arctan2(siny, cosy)
+    return np.array([roll, pitch, yaw])
+
+def posesFromQuaternionToRPY(poses):
+    '''Batch-convert a set of poses from quaternions to euler angles.'''
+    poses_xyzrpy = []
+    for i in range(0,len(poses)):
+        pose = np.zeros(6)
+        pose[0:3] = poses[i,0:3]
+        pose[3:6] = toEulerAngles(poses[i,3:7])
+        poses_xyzrpy.append(pose)
+
+    return np.array(poses_xyzrpy)
+
 
 def resize_to_multiple(images, multiples):
     '''Resize a batch of images in the height and width dimensions so their size are an integer
@@ -11,6 +51,11 @@ def resize_to_multiple(images, multiples):
                 Tensor of shape [batch, height, width, channels]
     multiples   :   int or tuple
                     The value/s that should evenly divide the resized image's dimensions
+
+    Returns
+    -------
+    tf.op
+        Tensorflow op for resizing images
     '''
     from tensorflow.image import resize_images
     _, h, w, _ = images.get_shape()
@@ -111,7 +156,6 @@ def convert_large_array(file_in, file_out, dtype, factor=1.0):
         np.multiply(dest, factor, out=dest)
 
 
-import conversions
 import numpy as np
 
 class DataManager(object):
@@ -146,7 +190,7 @@ class DataManager(object):
         return self.poses.shape[1] == 7
 
     def convertPosesToRPY(self):
-        self.poses = conversions.posesFromQuaternionToRPY(self.poses)
+        self.poses = posesFromQuaternionToRPY(self.poses)
 
     def batches(self):
 
