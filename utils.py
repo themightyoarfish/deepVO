@@ -165,9 +165,11 @@ class DataManager(object):
                  batch_size=100,
                  seq_len=2
                  ):
+
+        self.sequence_length = seq_len
         self.poses      = np.load(path_to_poses)
         self.images     = np.load(path_to_images)
-        self.seq_len    = seq_len
+        self.seq_len    = 2
         self.batch_size = batch_size
         # additional frames needed depending on sequence length
         self.add_frames = self.seq_len - 1
@@ -183,6 +185,10 @@ class DataManager(object):
             [self.batch_size, self.H, self.W, self.C * self.seq_len]
         )
 
+        self.image_stack_batch_with_sequences = np.zeros(
+            [self.batch_size, self.sequence_length, self.H, self.W, self.C * self.seq_len]
+        )
+
     def getImageShape(self):
         return (self.H, self.W, self.C)
 
@@ -194,7 +200,10 @@ class DataManager(object):
 
     def batches(self):
 
-        for batch_idx in range(0, self.N, len(self.image_indices)):
+        sequence_indices = np.arange(self.sequence_length)
+        print(sequence_indices)
+
+        for batch_idx in range(0, self.N, len(self.image_indices) ):
             # creating batch
 
             # TODO: better
@@ -208,7 +217,7 @@ class DataManager(object):
 
             # build differences of poses
             # later pictures poses - first pictures poses
-            diff_poses = self.poses[image_indices_global[self.add_frames:]] -self.poses[image_indices_global[:-self.add_frames] ]
+            diff_poses = self.poses[image_indices_global[self.add_frames:]] - self.poses[image_indices_global[:-self.add_frames] ]
 
             # build image sequences
             for idx in range(0, self.seq_len):
@@ -220,3 +229,53 @@ class DataManager(object):
                     self.image_stack_batch[..., begin:end] = self.images[image_indices_global[idx:-(self.add_frames - idx)]]
 
             yield self.image_stack_batch, diff_poses
+
+    def batchesWithSequences(self, diff_poses = False):
+
+        batch_count = 0
+
+
+        chunk_size = self.batch_size * self.sequence_length
+
+
+
+        batch_images = np.zeros(
+                [self.batch_size, self.sequence_length, self.H, self.W, self.C * 2]
+            )
+
+        batch_poses = np.zeros(
+                [self.batch_size, self.sequence_length, 6]
+        )
+
+        chunk_count = 0
+        for chunk_point in range(self.sequence_length-1, self.N, chunk_size):
+
+            seq_count = 0
+            for seq_point in range(chunk_point, chunk_point+chunk_size, self.sequence_length):
+                # print("chunk: " + str(chunk_point) + ", image_id: " + str(seq_point) )
+
+                if seq_point >= self.N:
+                    return
+
+                image_indices = np.arange(seq_point-self.sequence_length, seq_point)
+
+                # generate sequences
+                batch_images[seq_count,...,0:3] = self.images[ image_indices - 1 ]
+                batch_images[seq_count,...,3:6] = self.images[ image_indices ]
+
+                # generate diff poses
+                if diff_poses:
+                    seq_poses = self.poses[ image_indices ] - self.poses[ image_indices - 1 ]
+                else:
+                    seq_poses = self.poses[ image_indices ]
+
+                batch_poses[seq_count,...] = seq_poses
+
+                seq_count = seq_count + 1
+
+                # generate sequence and add it to batch
+
+            chunk_count = chunk_count + 1
+
+            yield batch_images, batch_poses
+
