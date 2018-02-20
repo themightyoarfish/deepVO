@@ -75,7 +75,17 @@ def subtract_mean_rgb(image_sequence):
     '''
     N, h, w, c = image_sequence.shape
     # compute mean separately for each channel
-    mode = image_sequence.mean((0, 1, 2)).astype(image_sequence.dtype)
+    # somehow this expression is buggy, so we must do it manually
+    # mode = image_sequence.mean((0, 1, 2)).astype(image_sequence.dtype)
+    mean_r = image_sequence[..., 0].mean()
+    mean_g = image_sequence[..., 1].mean()
+    mean_b = image_sequence[..., 2].mean()
+
+    # in order to make sure the subtraction is properly applied to each channel, we help the
+    # broadcasting process by making it an array of shape (1, 1, 1, 3)
+    mode = np.array([mean_r, mean_g, mean_b])
+    mode = mode[np.newaxis, np.newaxis, np.newaxis, ...]
+
     np.subtract(image_sequence, mode, out=image_sequence)
 
 
