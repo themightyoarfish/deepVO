@@ -36,9 +36,6 @@ class DataManager(object):
     def convertPosesToRPY(self):
         self.poses = conversions.posesFromQuaternionToRPY(self.poses)
 
-    def getNextBatch(self):
-        pass
-
     def batches(self):
 
         for batch_idx in range(0, self.N, len(self.image_indices) ):

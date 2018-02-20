@@ -140,7 +140,10 @@ def train():
     if dm.poseContainsQuaternion():
         dm.convertPosesToRPY()
 
+    c = 1
     for train_batch,label_batch in dm.batches():
+        print(c)
+        c= c+1
         print(train_batch.shape)
         print(label_batch.shape)
 
