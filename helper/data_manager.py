@@ -27,7 +27,8 @@ class DataManager(object):
                 [self.batch_size, self.H, self.W, self.C*self.seq_len]
             )
 
-
+    def getImageShape(self):
+        return (self.H, self.W, self.C)
 
     def poseContainsQuaternion(self):
         return self.poses.shape[1] == 7
@@ -52,13 +53,18 @@ class DataManager(object):
             # for seq_len = 3
             # image_indices_global[:-2], image_indices_global[1:-1], image_indices_global[2:]
 
+            # build differences of poses
+            # later pictures poses - first pictures poses
+            diff_poses = self.poses[ image_indices_global[self.add_frames:] ] - self.poses[ image_indices_global[:-self.add_frames] ]
+
+            # build image sequences
             for i in range(0, self.seq_len):
                 if(i == self.seq_len - 1):
                     self.image_stack_batch[..., self.C*i:self.C*(i+1)] = self.images[ image_indices_global[i:] ]
                 else:
                     self.image_stack_batch[..., self.C*i:self.C*(i+1)] = self.images[ image_indices_global[i:-(self.add_frames-i) ] ]
 
-            yield self.image_stack_batch
+            yield self.image_stack_batch, diff_poses
 
 
 
