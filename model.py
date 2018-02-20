@@ -27,7 +27,7 @@ class VOModel(object):
             self.input_images = tf.placeholder(tf.float32, shape=[None, sequence_length, h, w, 2 * c],
                                                name='imgs')
 
-            self.target_poses = tf.placeholder(tf.float32, shape=[None, 6],
+            self.target_poses = tf.placeholder(tf.float32, shape=[None, sequence_length, 6],
                                                name='poses')
             self.batch_size   = tf.placeholder(tf.int32, shape=[], name='batch_size')
             # self.hidden_state = tf.placeholder(tf.float32, shape=(None, memory_size),
