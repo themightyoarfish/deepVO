@@ -18,7 +18,7 @@ def main():
     args = parser.parse_args()
 
     sequence_length = 10
-    batch_size = 50
+    batch_size = 10
 
     if args.imgs:
         dm = DataManager(path_to_images=args.imgs,

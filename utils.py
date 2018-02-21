@@ -371,6 +371,8 @@ class DataManager2(object):
                 # generate diff poses
                 if diff_poses:
                     self.batch_poses[seq_count,...] = poses[1:] - poses[:-1]
+                    # or
+                    # self.batch_poses[seq_count,...] = poses[1:] - poses[0]
                 else:
                     self.batch_poses[seq_count,...] = poses[1:]
                 seq_count = seq_count + 1
