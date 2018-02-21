@@ -110,26 +110,28 @@ def image_pairs(image_sequence, sequence_length):
         yield ret
 
 
+def compute_rgb_mean(image_sequence):
+    N, h, w, c = image_sequence.shape
+    # compute mean separately for each channel
+    # somehow this expression is buggy, so we must do it manually
+    # mode = image_sequence.mean((0, 1, 2))
+    mean_r = image_sequence[..., 0].mean()
+    mean_g = image_sequence[..., 1].mean()
+    mean_b = image_sequence[..., 2].mean()
+    mean = np.array([mean_r, mean_g, mean_b])
+    return mean
+
 def subtract_mean_rgb(image_sequence):
-    '''Subtract the rgb mean in-place. The mean is computed and subtracted on each channel. The mean
-    is computed and subtracted on each channel.
+    '''Subtract the rgb mean in-place. The mean is computed and subtracted on each channel.
 
     Parameters
     ----------
     image_sequence  :   np.ndarray
                         Array of shape (N, h, w, c)
     '''
-    N, h, w, c = image_sequence.shape
-    # compute mean separately for each channel
-    # somehow this expression is buggy, so we must do it manually
-    # mode = image_sequence.mean((0, 1, 2)).astype(image_sequence.dtype)
-    mean_r = image_sequence[..., 0].mean()
-    mean_g = image_sequence[..., 1].mean()
-    mean_b = image_sequence[..., 2].mean()
-
+    mode = compute_rgb_mean(image_sequence)
     # in order to make sure the subtraction is properly applied to each channel, we help the
     # broadcasting process by making it an array of shape (1, 1, 1, 3)
-    mode = np.array([mean_r, mean_g, mean_b])
     mode = mode[np.newaxis, np.newaxis, np.newaxis, ...]
 
     np.subtract(image_sequence, mode, out=image_sequence)
@@ -164,17 +166,16 @@ class DataManager(object):
                  path_to_images='data/images.npy',
                  path_to_poses='data/poses.npy',
                  batch_size=100,
-                 seq_len=2
-                 ):
+                 seq_len=2):
 
         self.sequence_length = seq_len
-        self.poses      = np.load(path_to_poses)
-        self.images     = np.load(path_to_images)
+        self.poses           = np.load(path_to_poses)
+        self.images          = np.load(path_to_images)
 
-        self.seq_len    = 2
+        self.stack_num    = 2
         self.batch_size = batch_size
         # additional frames needed depending on sequence length
-        self.add_frames = self.seq_len - 1
+        self.add_frames = self.stack_num - 1
 
         self.N = self.images.shape[0]
         self.H = self.images.shape[1]
@@ -184,11 +185,11 @@ class DataManager(object):
         self.image_indices = np.arange(batch_size + self.add_frames)
 
         self.image_stack_batch = np.zeros(
-            [self.batch_size, self.H, self.W, self.C * self.seq_len]
+            [self.batch_size, self.H, self.W, self.C * self.stack_num]
         )
 
         self.image_stack_batch_with_sequences = np.zeros(
-            [self.batch_size, self.sequence_length, self.H, self.W, self.C * self.seq_len]
+            [self.batch_size, self.sequence_length, self.H, self.W, self.C * self.stack_num]
         )
 
     def getImageShape(self):
@@ -200,18 +201,17 @@ class DataManager(object):
     def convertPosesToRPY(self):
         self.poses = posesFromQuaternionToRPY(self.poses)
 
-    def numData():
+    def __len__(self):
         return self.N
 
     def storeDataToFileSystem(self, folder):
-        for i in range(0,self.images.shape[0]):
-            image = self.images[i]
-            image_filename = '/images/image%05d.npy' % i
+        for data_idx in range(0, self.images.shape[0]):
+            image          = self.images[data_idx]
+            image_filename = '/images/image%05d.npy' % data_idx
             np.save(folder + image_filename, image)
-            pose = self.poses[i]
-            pose_filename = '/poses/pose%05d.npy' % i
+            pose          = self.poses[data_idx]
+            pose_filename = '/poses/pose%05d.npy' % data_idx
             np.save(folder + pose_filename, pose)
-
 
     def batches(self):
 
@@ -235,17 +235,17 @@ class DataManager(object):
             diff_poses = self.poses[image_indices_global[self.add_frames:]] - self.poses[image_indices_global[:-self.add_frames] ]
 
             # build image sequences
-            for idx in range(0, self.seq_len):
+            for idx in range(0, self.stack_num):
                 begin = self.C * idx
                 end = self.C * (idx + 1)
-                if idx == self.seq_len - 1:
+                if idx == self.stack_num - 1:
                     self.image_stack_batch[..., begin:end] = self.images[image_indices_global[idx:]]
                 else:
                     self.image_stack_batch[..., begin:end] = self.images[image_indices_global[idx:-(self.add_frames - idx)]]
 
             yield self.image_stack_batch, diff_poses
 
-    def batchesWithSequences(self, diff_poses = False):
+    def batchesWithSequences(self, diff_poses=False):
 
         batch_count = 0
         chunk_size = self.batch_size * self.sequence_length
@@ -268,16 +268,16 @@ class DataManager(object):
                 image_indices = np.arange(seq_point-self.sequence_length, seq_point)
 
                 # generate sequences
-                batch_images[seq_count,...,0:3] = self.images[ image_indices - 1 ]
-                batch_images[seq_count,...,3:6] = self.images[ image_indices ]
+                batch_images[seq_count, ..., 0:3] = self.images[image_indices - 1]
+                batch_images[seq_count, ..., 3:6] = self.images[image_indices]
 
                 # generate diff poses
                 if diff_poses:
-                    seq_poses = self.poses[ image_indices ] - self.poses[ image_indices - 1 ]
+                    seq_poses = self.poses[image_indices] - self.poses[image_indices - 1]
                 else:
-                    seq_poses = self.poses[ image_indices ]
+                    seq_poses = self.poses[image_indices]
 
-                batch_poses[seq_count,...] = seq_poses
+                batch_poses[seq_count, ...] = seq_poses
 
                 seq_count = seq_count + 1
 
@@ -287,30 +287,31 @@ class DataManager(object):
 
             yield batch_images, batch_poses
 
-import os, os.path
+import os
+import os.path
+from os.path import join
 
 class DataManager2(object):
     def __init__(self,
                  dataset_path='data/dataset1/',
                  batch_size=10,
-                 seq_len=10,
+                 sequence_length=10,
                  debug=False,
-                 dtype='uint8'
-                 ):
+                 dtype=np.float32):
 
-        self.dtype = dtype
-        self.debug = debug
+        self.dtype        = dtype
+        self.debug        = debug
         self.dataset_path = dataset_path
-        self.images_path = dataset_path + 'images/'
-        self.poses_path = dataset_path + 'poses/'
+        self.images_path  = join(dataset_path, 'images')
+        self.poses_path   = join(dataset_path, 'poses')
 
         image_files = os.listdir(self.images_path)
-        self.N = len( image_files )
+        self.N = len(image_files)
 
-        self.num_dec_file = sum(c.isdigit() for c in image_files[0] )
+        self.num_dec_file = sum(c.isdigit() for c in image_files[0])
 
-        self.image_file_template = (self.images_path + 'image%0'+str(self.num_dec_file)+'d.npy')
-        self.pose_file_template = (self.poses_path + 'pose%0'+str(self.num_dec_file)+'d.npy')
+        self.image_file_template = join(self.images_path, 'image%0') + f'{self.num_dec_file}d.npy'
+        self.pose_file_template  = join(self.poses_path, 'pose%0') + f'{self.num_dec_file}d.npy'
 
         init_image = self.loadImage(0)
 
@@ -318,16 +319,15 @@ class DataManager2(object):
         self.W = init_image.shape[1]
         self.C = init_image.shape[2]
 
+        self.sequence_length = sequence_length
 
-        self.sequence_length = seq_len
-
-        self.seq_len    = 2
+        self.stack_num    = 2
         self.batch_size = batch_size
         # additional frames needed depending on sequence length
-        self.add_frames = self.seq_len - 1
+        self.add_frames = self.stack_num - 1
 
         self.batch_images = np.empty(
-            [self.batch_size, self.sequence_length, self.H, self.W, self.C * self.seq_len],
+            [self.batch_size, self.sequence_length, self.H, self.W, self.C * self.stack_num],
             dtype = dtype
         )
 
@@ -335,70 +335,72 @@ class DataManager2(object):
             [self.batch_size, self.sequence_length, 6]
         )
 
-        if(self.debug):
-            print("Datamanager Found " + str(self.N) + " images and poses in dataset." )
-            print("Image shape: ")
-            print( self.getImageShape() )
-
+        if self.debug:
+            print(f'Datamanager Found {self.N} images and poses in dataset.')
+            print(f'Image shape: {self.getImageShape()}')
 
     def getImageShape(self):
         return (self.H, self.W, self.C)
 
-    def numData(self):
+    def __len__(self):
         return self.N
 
-    def batches(self, diff_poses = False):
+    def batches(self, diff_poses=False):
         # 1D length of batch_size times sequence length
         chunk_size = self.batch_size * self.sequence_length
         chunk_count = 0
-        for chunk_point in range(self.sequence_length+1, self.N, chunk_size):
+        for chunk_point in range(self.sequence_length + 1, self.N, chunk_size):
             seq_count = 0
-            for seq_point in range(chunk_point, chunk_point+chunk_size, self.sequence_length):
-                # print("chunk: " + str(chunk_point) + ", image_id: " + str(seq_point) )
+            for seq_point in range(chunk_point, chunk_point + chunk_size, self.sequence_length):
 
                 if seq_point >= self.N:
                     return
 
-                image_indices = np.arange(seq_point-self.sequence_length-1, seq_point)
+                image_indices = np.arange(seq_point - self.sequence_length - 1, seq_point)
 
                 # generate sequences
                 images = self.loadImages(image_indices)
-                poses = self.loadPoses(image_indices)
+                poses  = self.loadPoses(image_indices)
 
-                self.batch_images[seq_count,...,0:3] = images[:-1]
-                self.batch_images[seq_count,...,3:7] = images[1:]
+                self.batch_images[seq_count, ..., 0:3] = images[:-1]
+                self.batch_images[seq_count, ..., 3:7] = images[1:]
 
                 # generate diff poses
                 if diff_poses:
-                    self.batch_poses[seq_count,...] = poses[1:] - poses[:-1]
+                    self.batch_poses[seq_count, ...] = poses[1:] - poses[:-1]
                 else:
-                    self.batch_poses[seq_count,...] = poses[1:]
+                    self.batch_poses[seq_count, ...] = poses[1:]
                 seq_count = seq_count + 1
 
-                # generate sequence and add it to batch
+            # generate sequence and add it to batch
             chunk_count = chunk_count + 1
 
             yield self.batch_images, self.batch_poses
 
     def loadImage(self, id):
-        return np.load( self.image_file_template % id)
+        return np.load(self.image_file_template % id)
 
+    def saveImage(self, id, img):
+        np.save(self.image_file_template % id, img)
 
     def loadImages(self, ids):
         num_images = len(ids)
-        images = np.empty([num_images, self.H, self.W, self.C], dtype=self.dtype)
+        images     = np.empty([num_images, self.H, self.W, self.C], dtype=self.dtype)
         for i in range(0, num_images):
             # right colors:
-            images[i] = self.loadImage( ids[i] )
+            images[i] = self.loadImage(ids[i])
 
         return images
 
     def loadPose(self, id):
         return np.load(self.pose_file_template % id)
 
+    def savePose(self, id, pose):
+        np.save(pose, self.image_pose_template % id)
+
     def loadPoses(self, ids):
         num_poses = len(ids)
-        poses = np.empty([num_poses, 6])
+        poses     = np.empty([num_poses, 6])
         for i in range(0, num_poses):
-            poses[i] = self.loadPose( ids[i] )
+            poses[i] = self.loadPose(ids[i])
         return poses
