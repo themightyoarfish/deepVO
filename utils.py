@@ -159,6 +159,12 @@ def convert_large_array(file_in, file_out, dtype, factor=1.0):
         np.multiply(dest, factor, out=dest)
 
 
+def subtract_poses(pose_x, pose_y):
+    pose_diff = np.subtract(pose_x, pose_y)
+    pose_diff[..., 3:6] = np.arctan2( np.sin(pose_diff[..., 3:6]), np.cos(pose_diff[..., 3:6]) )
+    return pose_diff
+
+
 import os
 from glob import glob
 from os.path import join
@@ -220,7 +226,7 @@ class DataManager(object):
     def __len__(self):
         return self.N
 
-    def batches(self, diff_poses=False):
+    def batches(self, diff_poses=True):
         # 1D length of batch_size times sequence length
         chunk_size = self.batch_size * self.sequence_length
         chunk_count = 0
@@ -242,8 +248,13 @@ class DataManager(object):
 
                 # generate diff poses
                 if diff_poses:
-                    self.batch_poses[seq_count, ...] = poses[1:] - poses[:-1]
+                    # substract first pose from all
+                    # absolute pose to first pose
+                    self.batch_poses[seq_count, ...] = subtract_poses(poses[1:], poses[0])
+                    # only relative poses
+                    # self.batch_poses[seq_count, ...] = np.subtract(poses[1:], poses[:-1])
                 else:
+                    # all abolute poses
                     self.batch_poses[seq_count, ...] = poses[1:]
                 seq_count = seq_count + 1
 
@@ -271,7 +282,7 @@ class DataManager(object):
         return np.load(self.pose_file_template % id)
 
     def savePose(self, id, pose):
-        np.save(pose, self.image_pose_template % id)
+        np.save(self.pose_file_template % id , pose)
 
     def loadPoses(self, ids):
         num_poses = len(ids)
