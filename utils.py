@@ -111,7 +111,10 @@ def image_pairs(image_sequence, sequence_length):
 
 
 def compute_rgb_mean(image_sequence):
-    N, h, w, c = image_sequence.shape
+    if image_sequence.ndim == 4:
+        N, h, w, c = image_sequence.shape
+    if image_sequence.ndim == 3:
+        h, w, c = image_sequence.shape
     # compute mean separately for each channel
     # somehow this expression is buggy, so we must do it manually
     # mode = image_sequence.mean((0, 1, 2))
@@ -120,22 +123,6 @@ def compute_rgb_mean(image_sequence):
     mean_b = image_sequence[..., 2].mean()
     mean = np.array([mean_r, mean_g, mean_b])
     return mean
-
-def subtract_mean_rgb(image_sequence):
-    '''Subtract the rgb mean in-place. The mean is computed and subtracted on each channel.
-
-    Parameters
-    ----------
-    image_sequence  :   np.ndarray
-                        Array of shape (N, h, w, c)
-    '''
-    mode = compute_rgb_mean(image_sequence)
-    # in order to make sure the subtraction is properly applied to each channel, we help the
-    # broadcasting process by making it an array of shape (1, 1, 1, 3)
-    mode = mode[np.newaxis, np.newaxis, np.newaxis, ...]
-
-    np.subtract(image_sequence, mode, out=image_sequence)
-
 
 def convert_large_array(file_in, file_out, dtype, factor=1.0):
     '''Convert data type of an array possibly too large to fit in memory.
@@ -196,19 +183,14 @@ class DataManager(object):
 
         self.sequence_length = sequence_length
 
-        self.stack_num    = 2
         self.batch_size = batch_size
         # additional frames needed depending on sequence length
-        self.add_frames = self.stack_num - 1
-
         self.batch_images = np.empty(
-            [self.batch_size, self.sequence_length, self.H, self.W, self.C * self.stack_num],
-            dtype = dtype
+            [self.batch_size, self.sequence_length, self.H, self.W, self.C * 2],
+            dtype=dtype
         )
 
-        self.batch_poses = np.empty(
-            [self.batch_size, self.sequence_length, 6]
-        )
+        self.batch_poses = np.empty([self.batch_size, self.sequence_length, 6])
 
         if self.debug:
             print(f'Datamanager Found {self.N} images and poses in dataset.')
@@ -220,40 +202,32 @@ class DataManager(object):
     def __len__(self):
         return self.N
 
-    def batches(self, diff_poses=False):
-        # 1D length of batch_size times sequence length
+    def batches(self):
+        # 1D length of batch_size x sequence length
         chunk_size = self.batch_size * self.sequence_length
-        chunk_count = 0
-        for chunk_point in range(self.sequence_length + 1, self.N, chunk_size):
-            seq_count = 0
-            for seq_point in range(chunk_point, chunk_point + chunk_size, self.sequence_length):
+        for batch_start_idx in range(0, self.N, chunk_size):
+            record_in_batch = 0
+            for sequence_start_idx in range(batch_start_idx, batch_start_idx + chunk_size, self.sequence_length):
 
-                if seq_point >= self.N:
+                sequence_end_idx = sequence_start_idx + self.sequence_length + 1
+                if sequence_end_idx >= self.N:
                     return
-
-                image_indices = np.arange(seq_point - self.sequence_length - 1, seq_point)
+                image_indices = np.arange(sequence_start_idx, sequence_end_idx)
 
                 # generate sequences
                 images = self.loadImages(image_indices)
                 poses  = self.loadPoses(image_indices)
 
-                self.batch_images[seq_count, ..., 0:3] = images[:-1]
-                self.batch_images[seq_count, ..., 3:7] = images[1:]
+                self.batch_images[record_in_batch, ..., :3] = images[:-1]
+                self.batch_images[record_in_batch, ..., 3:] = images[1:]
 
-                # generate diff poses
-                if diff_poses:
-                    self.batch_poses[seq_count, ...] = poses[1:] - poses[:-1]
-                else:
-                    self.batch_poses[seq_count, ...] = poses[1:]
-                seq_count = seq_count + 1
-
-            # generate sequence and add it to batch
-            chunk_count = chunk_count + 1
+                self.batch_poses[record_in_batch, ...] = poses[1:]
+                record_in_batch += 1
 
             yield self.batch_images, self.batch_poses
 
     def loadImage(self, id):
-        return np.load(self.image_file_template % id)
+        return np.squeeze(np.load(self.image_file_template % id))
 
     def saveImage(self, id, img):
         np.save(self.image_file_template % id, img)
@@ -261,6 +235,7 @@ class DataManager(object):
     def loadImages(self, ids):
         num_images = len(ids)
         images     = np.empty([num_images, self.H, self.W, self.C], dtype=self.dtype)
+        __import__('ipdb').set_trace()
         for i in range(0, num_images):
             # right colors:
             images[i] = self.loadImage(ids[i])
