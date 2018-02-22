@@ -84,7 +84,8 @@ class VOModel(object):
                                                  n_channels,
                                                  reuse=tf.AUTO_REUSE))
 
-        rnn_inputs = [tf.reshape(conv, [batch_size, tf.reduce_prod(conv.get_shape()[1:])])
+        # flatten cnn output for each batch element
+        rnn_inputs = [tf.reshape(conv, [batch_size, -1])
                       for conv in self.cnn_activations]
 
         ############################################################################################
@@ -96,31 +97,41 @@ class VOModel(object):
             lstm2 = LSTMCell(memory_size, state_is_tuple=True)
             rnn   = MultiRNNCell([lstm1, lstm2])
 
-            self.zero_state   = rnn.zero_state(batch_size, tf.float32)
+            self.zero_state = rnn.zero_state(batch_size, tf.float32)
 
             # first decompose state input into the two layers
             states1 = self.lstm_states[0, ...]
             states2 = self.lstm_states[1, ...]
 
             # then retrieve two memory_size-sized tensors from each state item
-            states1_list = tf.unstack(states1, num=2)
-            cell_state1 = states1_list[0]
+            states1_list  = tf.unstack(states1, num=2)
+            cell_state1   = states1_list[0]
             hidden_state1 = states1_list[1]
 
-            states2_list = tf.unstack(states2, num=2)
-            cell_state2 = states1_list[0]
-            hidden_state2 = states1_list[1]
+            states2_list  = tf.unstack(states2, num=2)
+            cell_state2   = states2_list[0]
+            hidden_state2 = states2_list[1]
 
             # finally, create the state tuples
             state1 = LSTMStateTuple(c=hidden_state1, h=cell_state1)
             state2 = LSTMStateTuple(c=hidden_state2, h=cell_state2)
 
-            self.rnn_outputs, self.rnn_state  = static_rnn(rnn,
-                                                           rnn_inputs,
-                                                           dtype=tf.float32,
-                                                           initial_state=(state1, state2),
-                                                           sequence_length=[sequence_length] * batch_size)
+            rnn_outputs, self.rnn_state = static_rnn(rnn,
+                                                     rnn_inputs,
+                                                     dtype=tf.float32,
+                                                     initial_state=(state1, state2),
+                                                     sequence_length=[sequence_length] * batch_size)
+            rnn_outputs = tf.reshape(tf.concat(rnn_outputs, 1),
+                                     [batch_size, sequence_length * memory_size])
 
+        ############################################################################################
+        #                                       Output layer                                       #
+        ############################################################################################
+        with tf.variable_scope('feedforward'):
+            n_rnn_output = rnn_outputs.get_shape()[-1]  # number of activations per batch
+            network_function = tf.layers.dense(rnn_outputs, kernel_initializer=tf.random_normal_initializer(stddev=np.sqrt(2 / n_rnn_output)))
+
+        self.loss = loss(network_function, target_poses)
 
     def cnn(self, input, ksizes, strides, n_channels, use_dropout=False, reuse=True):
         '''Create all the conv layers as specified in the paper.'''
@@ -190,7 +201,6 @@ class VOModel(object):
                                                             self.target_poses: pose_batch,
                                                             self.lstm_states: initial_states})
 
-
     def get_cnn_output(self, session, input_batch, pose_batch):
         '''Run some input through the cnn net.
 
@@ -204,7 +214,5 @@ class VOModel(object):
         pose_batch :   np.ndarray
                         Array of shape (batch_size, sequence_length, 6) with Poses
         '''
-        batch_size = input_batch.shape[0]
-
         return session.run(self.cnn_activations, feed_dict={self.input_images: input_batch,
                                                             self.target_poses: pose_batch})

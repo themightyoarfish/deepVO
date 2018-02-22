@@ -16,7 +16,7 @@ def main():
     parser.add_argument('-d', '--dataset', type=str, required=True, help='Path to dataset folder')
     args = parser.parse_args()
 
-    sequence_length = 2
+    sequence_length = 4
     batch_size      = 2
     memory_size     = 100
 
