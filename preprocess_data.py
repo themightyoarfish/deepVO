@@ -50,13 +50,16 @@ def mean_normalize(data_manager):
         mean_accumlator += compute_rgb_mean(img)
 
     mean_accumlator /= N
+    print(f'Mean: {mean_accumlator}')
     for idx in range(N):
 
         if idx % 10 == 0:
             print(f'\r{idx+1:4d}/{N}', end='')
-
+        img = data_manager.loadImage(idx)
         data_manager.saveImage(idx, img - mean_accumlator)
     print('\nDone')
+
+
 
 
 
