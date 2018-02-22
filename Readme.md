@@ -3,14 +3,17 @@
 This is our submission for the ANN with TensorFlow course, winter 2017.
 
 
-
-
-
-Dataset structure for DataManager:
-
-argument main.py
--d [dataset_folder]
-
-examples:
-dataset_folder/images/image0001.npy
-dataset_folder/poses/pose0022.npy
+## Data Preprocessing
+### Bagfile conversion
+The first thing to do is to convert the rosbag sensor recordings with the
+conversion tool lik this
+```
+bag_to_cam_pose_data -b <file>.bag  -d <outdir> -x -P
+```
+The `-P` flag is to dump one npy file for each image and pose. The `-x`
+flag is for writing float image arrays instead of uint8.
+This will create `images` and `poses` folders inside the chosen directory.
+### Further preprocessing
+Use the `preprocess_data.py` script with `-d <path-to-data>` and `-m` to
+subtract the mean value channel wise. Changes will be written back to the
+original files.
