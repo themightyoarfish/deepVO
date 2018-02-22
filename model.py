@@ -2,10 +2,39 @@ import tensorflow as tf
 from math import ceil
 from tensorflow.contrib.rnn import *
 import numpy as np
+from utils import array_from_lstm_tuple
+
 
 class VOModel(object):
 
-    '''Model class of the RCNN for visual odometry.'''
+    '''Model class of the RCNN for visual odometry.
+
+    Attributes
+    ----------
+    input_images    :   tf.Placeholder
+                        Float placeholder with shape (batch_size, sequence_length, h, w, c * 2).
+                        This tensor contains the stacked input images.
+    target_poses    :   tf.Placeholder
+                        Float placeholder of shape (batch_size, sequence_length, 6) with 3
+                        translational and 3 rotational components
+    lstm_states :   tf.Placeholder
+                    Float placeholder used to feed the initial lstm state into the network. The shape
+                    is (2, 2, batch_size, memory_size) since we have 2 lstm cells and cell and hidden
+                    states are contained in this tensor. THE CELL STATE (TUPLE MEMBER H) MUST COME
+                    BEFORE THE HIDDEN STATE (TUPLE MEMBER C).
+    sequence_length :   int
+                        Length of the input sequences (cannot be altered)
+
+    cnn_activations :   list(tf.Tensor)
+                        List of cnn activations for all time steps
+    zero_state  :   tuple(LSTMStateTuple)
+                    Tuple of LSTMStateTuples for each lstm layer. Filled with zeros.
+    rnn_outputs :   tf.Tensor
+                    outputs of the RNN
+    rnn_state   :   tuple(LSTMStateTuple)
+                    Final states of the lstms
+
+    '''
 
     def __init__(self, image_shape, memory_size, sequence_length, batch_size):
         '''
@@ -32,10 +61,11 @@ class VOModel(object):
 
             self.target_poses = tf.placeholder(tf.float32, shape=[batch_size, sequence_length, 6],
                                                name='poses')
-            self.hidden_states = tf.placeholder(tf.float32, shape=(2, batch_size, memory_size),
-                                               name='hidden_state')
-            self.cell_states   = tf.placeholder(tf.float32, shape=(2, batch_size, memory_size),
-                                               name='cell_state')
+            # this placeholder is used for feeding both the cell and hidden states of both lstm
+            # cells. The cell state comes before the hidden state
+            N_lstm = 2
+            self.lstm_states = tf.placeholder(tf.float32, shape=(N_lstm, 2,  batch_size, memory_size),
+                                               name='LSTM_states')
             self.sequence_length = sequence_length
 
         ############################################################################################
@@ -67,10 +97,23 @@ class VOModel(object):
             rnn   = MultiRNNCell([lstm1, lstm2])
 
             self.zero_state   = rnn.zero_state(batch_size, tf.float32)
-            hidden_state_list = tf.unstack(self.hidden_states, num=2)
-            cell_state_list   = tf.unstack(self.cell_states, num=2)
-            state1            = LSTMStateTuple(c=hidden_state_list[0], h=cell_state_list[0])
-            state2            = LSTMStateTuple(c=hidden_state_list[1], h=cell_state_list[1])
+
+            # first decompose state input into the two layers
+            states1 = self.lstm_states[0, ...]
+            states2 = self.lstm_states[1, ...]
+
+            # then retrieve two memory_size-sized tensors from each state item
+            states1_list = tf.unstack(states1, num=2)
+            cell_state1 = states1_list[0]
+            hidden_state1 = states1_list[1]
+
+            states2_list = tf.unstack(states2, num=2)
+            cell_state2 = states1_list[0]
+            hidden_state2 = states1_list[1]
+
+            # finally, create the state tuples
+            state1 = LSTMStateTuple(c=hidden_state1, h=cell_state1)
+            state2 = LSTMStateTuple(c=hidden_state2, h=cell_state2)
 
             self.rnn_outputs, self.rnn_state  = static_rnn(rnn,
                                                            rnn_inputs,
@@ -123,7 +166,7 @@ class VOModel(object):
         '''
         return session.run(self.zero_state)
 
-    def get_rnn_output(self, session, input_batch, pose_batch, initial_state=None):
+    def get_rnn_output(self, session, input_batch, pose_batch, initial_states=None):
         '''Run some input through the cnn net, followed by the rnn net
 
         Parameters
@@ -131,21 +174,21 @@ class VOModel(object):
         session :   tf.Session
                     Session to execute op in
         input_batch  :  np.ndarray
-                        Array of shape (batch_size, sequence_length, h, w, 6) were two consecutive
+                        Array of shape (batch_size, sequence_length, h, w, 6) where two consecutive
                         rgb images are stacked together.
         pose_batch  :   np.ndarray
-                        Array of shape (batch_size, sequence_length, 7) with Poses
-        initial_state   :   LSTMStateTuple (aka namedtuple(c,h))
-                            Previous state
+                        Array of shape (batch_size, sequence_length, 6) with Poses
+        initial_states   :   np.ndarray
+                            Array of shape (2, 2, batch_size, memory_size)
         '''
         batch_size = input_batch.shape[0]
 
-        if initial_state is None:
-            initial_state = self.get_zero_state(session, batch_size)
-            __import__('ipdb').set_trace()
+        if initial_states is None:
+            initial_states = array_from_lstm_tuple(self.get_zero_state(session))
 
         return session.run(self.cnn_activations, feed_dict={self.input_images: input_batch,
-                                                            self.target_poses: pose_batch})
+                                                            self.target_poses: pose_batch,
+                                                            self.lstm_states: initial_states})
 
 
     def get_cnn_output(self, session, input_batch, pose_batch):
@@ -156,10 +199,10 @@ class VOModel(object):
         session :   tf.Session
                     Session to execute op in
         input_batch  :  np.ndarray
-                        Array of shape (batch_size, sequence_length, h, w, 6) were two consecutive
+                        Array of shape (batch_size, sequence_length, h, w, 6) where two consecutive
                         rgb images are stacked together.
         pose_batch :   np.ndarray
-                        Array of shape (batch_size, sequence_length, 7) with Poses
+                        Array of shape (batch_size, sequence_length, 6) with Poses
         '''
         batch_size = input_batch.shape[0]
 
