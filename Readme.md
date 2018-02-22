@@ -6,7 +6,7 @@ This is our submission for the ANN with TensorFlow course, winter 2017.
 
 
 
-Dataset structure for DataManager2:
+Dataset structure for DataManager:
 
 argument main.py
 -d [dataset_folder]

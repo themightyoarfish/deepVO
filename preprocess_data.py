@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 import numpy as np
 import sys
 
-from utils import DataManager2 as DataManager, compute_rgb_mean
+from utils import DataManager, compute_rgb_mean
 
 
 def main():

@@ -163,7 +163,7 @@ import os
 from glob import glob
 from os.path import join
 
-class DataManager2(object):
+class DataManager(object):
     def __init__(self,
                  dataset_path='data/dataset1/',
                  batch_size=10,
