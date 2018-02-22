@@ -7,7 +7,7 @@ class VOModel(object):
 
     '''Model class of the RCNN for visual odometry.'''
 
-    def __init__(self, image_shape, memory_size, sequence_length):
+    def __init__(self, image_shape, memory_size, sequence_length, batch_size):
         '''
         Parameters
         ----------
@@ -16,6 +16,8 @@ class VOModel(object):
                         LSTM state size
         sequence_length :   int
                             Length of the video stream
+        batch_size  :   int
+                        Size of the batches for training (necessary for RNN state)
         '''
 
         ############################################################################################
@@ -24,16 +26,15 @@ class VOModel(object):
         with tf.variable_scope('inputs'):
             h, w, c = image_shape
             # TODO: Resize images before stacking. Maybe do that outside of the graph?
-            self.input_images = tf.placeholder(tf.float32, shape=[None, sequence_length, h, w, 2 * c],
+            self.input_images = tf.placeholder(tf.float32, shape=[batch_size, sequence_length, h, w, 2 * c],
                                                name='imgs')
 
 
-            self.target_poses = tf.placeholder(tf.float32, shape=[None, sequence_length, 6],
+            self.target_poses = tf.placeholder(tf.float32, shape=[batch_size, sequence_length, 6],
                                                name='poses')
-            self.batch_size   = tf.placeholder(tf.int32, shape=[], name='batch_size')
-            self.hidden_state = tf.placeholder(tf.float32, shape=(None, memory_size),
+            self.hidden_state = tf.placeholder(tf.float32, shape=(batch_size, memory_size),
                                                name='hidden_state')
-            self.cell_state   = tf.placeholder(tf.float32, shape=(None, memory_size),
+            self.cell_state   = tf.placeholder(tf.float32, shape=(batch_size, memory_size),
                                                name='cell_state')
             self.sequence_length = sequence_length
 
@@ -53,7 +54,7 @@ class VOModel(object):
                                                  n_channels,
                                                  reuse=tf.AUTO_REUSE))
 
-        rnn_inputs = [tf.reshape(conv, [self.batch_size, tf.reduce_prod(conv.get_shape()[1:])])
+        rnn_inputs = [tf.reshape(conv, [batch_size, tf.reduce_prod(conv.get_shape()[1:])])
                       for conv in self.cnn_activations]
 
         ############################################################################################
@@ -61,15 +62,16 @@ class VOModel(object):
         ############################################################################################
         with tf.variable_scope('rnn'):
             '''Create all recurrent layers as specified in the paper.'''
-            lstm1 = LSTMCell(memory_size)
-            lstm2 = LSTMCell(memory_size)
+            lstm1 = LSTMCell(memory_size, state_is_tuple=True)
+            lstm2 = LSTMCell(memory_size, state_is_tuple=True)
             rnn   = MultiRNNCell([lstm1, lstm2])
 
-            self.zero_state = rnn.zero_state(self.batch_size, tf.float32)
+            self.zero_state = rnn.zero_state(batch_size, tf.float32)
             state           = LSTMStateTuple(c=self.hidden_state, h=self.cell_state)
 
             self.rnn_outputs, self.rnn_state  = static_rnn(rnn, rnn_inputs, dtype=tf.float32,
-                                                           initial_state=state)
+                                                           initial_state=state,
+                                                           sequence_length=[sequence_length] * batch_size)
 
 
     def cnn(self, input, ksizes, strides, n_channels, use_dropout=False, reuse=True):
@@ -106,17 +108,15 @@ class VOModel(object):
 
             return output
 
-    def get_zero_state(self, session, batch_size):
+    def get_zero_state(self, session):
         '''Obtain the RNN zero state.
 
         Parameters
         ----------
         session :   tf.Session
                     Session to execute op in
-        batch_size  :   int
-                        Batch size (influences the size of the RNN state)
         '''
-        return session.run(self.zero_state, feed_dict={self.batch_size: batch_size})
+        return session.run(self.zero_state)
 
     def get_rnn_output(self, session, input_batch, pose_batch, initial_state=None):
         '''Run some input through the cnn net, followed by the rnn net
@@ -139,8 +139,7 @@ class VOModel(object):
             initial_state = self.get_zero_state(session, batch_size)
 
         return session.run(self.cnn_activations, feed_dict={self.input_images: input_batch,
-                                                            self.target_poses: pose_batch,
-                                                            self.batch_size: batch_size})
+                                                            self.target_poses: pose_batch})
 
 
     def get_cnn_output(self, session, input_batch, pose_batch, initial_state=None):
@@ -164,5 +163,4 @@ class VOModel(object):
         #     initial_state = self.get_zero_state(session, batch_size)
 
         return session.run(self.cnn_activations, feed_dict={self.input_images: input_batch,
-                                                            self.target_poses: pose_batch,
-                                                            self.batch_size: batch_size})
+                                                            self.target_poses: pose_batch})

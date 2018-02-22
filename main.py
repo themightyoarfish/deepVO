@@ -29,7 +29,7 @@ def main():
     image_shape = dm.getImageShape()
 
     # create model
-    model = VOModel(image_shape, memory_size, sequence_length)
+    model = VOModel(image_shape, memory_size, sequence_length, batch_size)
 
     with tf.Session() as session:
         for images, poses in dm.batches():
