@@ -171,6 +171,9 @@ class DataManager(object):
                  debug=False,
                  dtype=np.float32):
 
+        if not os.path.exists(dataset_path):
+            raise ValueError(f'Path {dataset_path} does not exist.')
+
         self.dtype        = dtype
         self.debug        = debug
         self.dataset_path = dataset_path

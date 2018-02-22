@@ -112,26 +112,26 @@ class VOModel(object):
         Parameters
         ----------
         session :   tf.Session
-        Session to execute op in
+                    Session to execute op in
         batch_size  :   int
-        Batch size (influences the size of the RNN state)
+                        Batch size (influences the size of the RNN state)
         '''
         return session.run(self.zero_state, feed_dict={self.batch_size: batch_size})
 
-    def get_rnn_output(self, session, input_batch, label_batch, initial_state=None):
+    def get_rnn_output(self, session, input_batch, pose_batch, initial_state=None):
         '''Run some input through the cnn net, followed by the rnn net
 
         Parameters
         ----------
         session :   tf.Session
-        Session to execute op in
+                    Session to execute op in
         input_batch  :  np.ndarray
-        Array of shape (batch_size, sequence_length, h, w, 6) were two consecutive
-        rgb images are stacked together.
-        label_batch :   np.ndarray
-        Array of shape (batch_size, sequence_length, 7) with Poses
+                        Array of shape (batch_size, sequence_length, h, w, 6) were two consecutive
+                        rgb images are stacked together.
+        pose_batch  :   np.ndarray
+                        Array of shape (batch_size, sequence_length, 7) with Poses
         initial_state   :   LSTMStateTuple (aka namedtuple(c,h))
-        Previous state
+                            Previous state
         '''
         batch_size = input_batch.shape[0]
 
@@ -139,24 +139,24 @@ class VOModel(object):
             initial_state = self.get_zero_state(session, batch_size)
 
         return session.run(self.cnn_activations, feed_dict={self.input_images: input_batch,
-                                                            self.target_poses: label_batch,
+                                                            self.target_poses: pose_batch,
                                                             self.batch_size: batch_size})
 
 
-    def get_cnn_output(self, session, input_batch, label_batch, initial_state=None):
+    def get_cnn_output(self, session, input_batch, pose_batch, initial_state=None):
         '''Run some input through the cnn net.
 
         Parameters
         ----------
         session :   tf.Session
-        Session to execute op in
+                    Session to execute op in
         input_batch  :  np.ndarray
-        Array of shape (batch_size, sequence_length, h, w, 6) were two consecutive
-        rgb images are stacked together.
-        label_batch :   np.ndarray
-        Array of shape (batch_size, sequence_length, 7) with Poses
+                        Array of shape (batch_size, sequence_length, h, w, 6) were two consecutive
+                        rgb images are stacked together.
+        pose_batch :   np.ndarray
+                        Array of shape (batch_size, sequence_length, 7) with Poses
         initial_state   :   LSTMStateTuple (aka namedtuple(c,h))
-        Previous state
+                            Previous state
         '''
         batch_size = input_batch.shape[0]
 
@@ -164,5 +164,5 @@ class VOModel(object):
         #     initial_state = self.get_zero_state(session, batch_size)
 
         return session.run(self.cnn_activations, feed_dict={self.input_images: input_batch,
-                                                            self.target_poses: label_batch,
+                                                            self.target_poses: pose_batch,
                                                             self.batch_size: batch_size})
