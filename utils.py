@@ -146,6 +146,12 @@ def convert_large_array(file_in, file_out, dtype, factor=1.0):
         np.multiply(dest, factor, out=dest)
 
 
+def subtract_poses(pose_x, pose_y):
+    pose_diff = np.subtract(pose_x, pose_y)
+    pose_diff[..., 3:6] = np.arctan2( np.sin(pose_diff[..., 3:6]), np.cos(pose_diff[..., 3:6]) )
+    return pose_diff
+
+
 import os
 from glob import glob
 from os.path import join
@@ -168,7 +174,7 @@ class DataManager(object):
         self.poses_path   = join(dataset_path, 'poses')
 
         image_files = glob(join(self.images_path, '*.npy'))
-        self.N = len(image_files)
+        self.N      = len(image_files)
 
         self.num_dec_file = sum(c.isdigit() for c in os.path.basename(image_files[0]))
 
@@ -193,7 +199,7 @@ class DataManager(object):
         self.batch_poses = np.empty([self.batch_size, self.sequence_length, 6])
 
         if self.debug:
-            print(f'Datamanager Found {self.N} images and poses in dataset.')
+            print(f'DataManager found {self.N} images and poses in dataset.')
             print(f'Image shape: {self.getImageShape()}')
 
     def getImageShape(self):
@@ -203,7 +209,7 @@ class DataManager(object):
         return self.N
 
     def batches(self):
-        # 1D length of batch_size x sequence length
+        # 1D length of batch_size times sequence length
         chunk_size = self.batch_size * self.sequence_length
         for batch_start_idx in range(0, self.N, chunk_size):
             record_in_batch = 0
@@ -221,7 +227,9 @@ class DataManager(object):
                 self.batch_images[record_in_batch, ..., :3] = images[:-1]
                 self.batch_images[record_in_batch, ..., 3:] = images[1:]
 
-                self.batch_poses[record_in_batch, ...] = poses[1:]
+                # subtract first pose from all
+                # absolute pose to first pose
+                self.batch_poses[record_in_batch, ...] = subtract_poses(poses[1:], poses[0])
                 record_in_batch += 1
 
             yield self.batch_images, self.batch_poses
@@ -235,7 +243,6 @@ class DataManager(object):
     def loadImages(self, ids):
         num_images = len(ids)
         images     = np.empty([num_images, self.H, self.W, self.C], dtype=self.dtype)
-        __import__('ipdb').set_trace()
         for i in range(0, num_images):
             # right colors:
             images[i] = self.loadImage(ids[i])
@@ -246,7 +253,7 @@ class DataManager(object):
         return np.load(self.pose_file_template % id)
 
     def savePose(self, id, pose):
-        np.save(pose, self.image_pose_template % id)
+        np.save(self.pose_file_template % id , pose)
 
     def loadPoses(self, ids):
         num_poses = len(ids)
