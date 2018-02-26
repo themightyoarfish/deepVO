@@ -2,7 +2,7 @@ import tensorflow as tf
 from math import ceil
 from tensorflow.contrib.rnn import *
 import numpy as np
-from utils import array_from_lstm_tuple
+from utils import tensor_from_lstm_tuple
 
 
 class VOModel(object):
@@ -116,13 +116,14 @@ class VOModel(object):
             state1 = LSTMStateTuple(c=hidden_state1, h=cell_state1)
             state2 = LSTMStateTuple(c=hidden_state2, h=cell_state2)
 
-            rnn_outputs, self.rnn_state = static_rnn(rnn,
+            rnn_outputs, rnn_state = static_rnn(rnn,
                                                      rnn_inputs,
                                                      dtype=tf.float32,
                                                      initial_state=(state1, state2),
                                                      sequence_length=[sequence_length] * batch_size)
             rnn_outputs = tf.reshape(tf.concat(rnn_outputs, 1),
                                      [batch_size, sequence_length, memory_size])
+            self.rnn_state = tensor_from_lstm_tuple(rnn_state)
 
         ############################################################################################
         #                                       Output layer                                       #
@@ -137,6 +138,8 @@ class VOModel(object):
             x_t, x_r = tf.split(self.target_poses, 2, axis=2)
 
         self.loss = self.loss_function((x_t, x_r), (y_t, y_r))
+        optimizer = tf.train.AdagradOptimizer(0.001)
+        self.train_step = optimizer.minimize(self.loss)
 
     def loss_function(self, targets, predictions, rot_weight=100):
         '''Create MSE loss.
@@ -219,11 +222,6 @@ class VOModel(object):
         initial_states   :   np.ndarray
                             Array of shape (2, 2, batch_size, memory_size)
         '''
-        batch_size = input_batch.shape[0]
-
-        if initial_states is None:
-            initial_states = array_from_lstm_tuple(self.get_zero_state(session))
-
         return session.run(self.loss, feed_dict={self.input_images: input_batch,
                                                             self.target_poses: pose_batch,
                                                             self.lstm_states: initial_states})
@@ -243,3 +241,25 @@ class VOModel(object):
         '''
         return session.run(self.cnn_activations, feed_dict={self.input_images: input_batch,
                                                             self.target_poses: pose_batch})
+
+    def train(self, session, input_batch, pose_batch, initial_states=None):
+        '''Train the network.
+
+        Parameters
+        ----------
+        session :   tf.Session
+                    Session to execute op in
+        input_batch  :  np.ndarray
+                        Array of shape (batch_size, sequence_length, h, w, 6) where two consecutive
+                        rgb images are stacked together.
+        pose_batch  :   np.ndarray
+                        Array of shape (batch_size, sequence_length, 6) with Poses
+        initial_states   :   np.ndarray
+                            Array of shape (2, 2, batch_size, memory_size)
+        '''
+        if initial_states is None:
+            initial_states = tensor_from_lstm_tuple(self.get_zero_state(session))
+
+        return session.run([self.train_step, self.loss, self.rnn_state], feed_dict={self.input_images: input_batch,
+                                                            self.target_poses: pose_batch,
+                                                            self.lstm_states: initial_states})

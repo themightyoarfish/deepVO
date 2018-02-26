@@ -2,36 +2,39 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 
-def array_from_lstm_tuple(tup):
-    '''Create an array from a tuple of :py:class:``LSTMStateTuple``s.
+def tensor_from_lstm_tuple(tup):
+    '''Create a tensor from a tuple of :py:class:`tf.contrib.rnn.LSTMStateTuple` s.
 
     Parameters
     ----------
     tup :   tuple(LSTMStateTuple)
-            Tuple of N_lstm ``LSTMStateTuple``s where each of the tuples has members of shape
+            Tuple of N_lstm ``LSTMStateTuple`` s where each of the tuples has members of shape
             ``(batch_size, memory_size)``
 
     Returns
     -------
-    np.ndarray
-        Array of shape (N_lstm, 2, batch_size, memory_size) with cell and hidden states per lstm cell
+    tf.Tensor
+        Tensor of shape ``(N_lstm, 2, batch_size, memory_size)`` with cell and hidden states per lstm cell
         stacked together
     '''
-    # one state tuple has two members of shape (batch_size, memory_size)
-    N_lstm      = len(tup)
-    batch_size  = tup[0].c.shape[0]
-    memory_size = tup[0].c.shape[1]
-    # return value
-    array       = np.empty((N_lstm, 2, batch_size, memory_size))
+    import tensorflow as tf
 
-    for lstm_idx in range(N_lstm):
-        lstm_state = tup[lstm_idx]
-        if not ((batch_size, memory_size) == lstm_state.c.shape == lstm_state.h.shape):
-            raise ValueError('All states must have the same dimenstion.')
-        array[lstm_idx, 0, ...] = lstm_state.h  # cell state
-        array[lstm_idx, 1, ...] = lstm_state.c  # hidden state
+    with tf.variable_scope('tuple_to_tensor'):
+        # one state tuple has two members of shape (batch_size, memory_size)
+        N_lstm      = len(tup)
+        batch_size  = tup[0].c.shape[0]
+        memory_size = tup[0].c.shape[1]
+        # return value
+        array       = [[None, None]] * N_lstm #tf.zeros((N_lstm, 2, batch_size, memory_size), dtype=tf.float32)
 
-    return array
+        for lstm_idx in range(N_lstm):
+            lstm_state = tup[lstm_idx]
+            if not ((batch_size, memory_size) == lstm_state.c.shape == lstm_state.h.shape):
+                raise ValueError('All states must have the same dimenstion.')
+            array[lstm_idx][0] = lstm_state.h  # cell state
+            array[lstm_idx][1] = lstm_state.c  # hidden state
+
+        return array
 
 
 # q = x,y,z,w

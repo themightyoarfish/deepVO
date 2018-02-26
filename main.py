@@ -32,9 +32,10 @@ def main():
     model = VOModel(image_shape, memory_size, sequence_length, batch_size)
 
     with tf.Session() as session:
+        session.run(tf.global_variables_initializer())
+        states = None
         for images, poses in dm.batches():
-            session.run(tf.global_variables_initializer())
-            loss = model.get_rnn_output(session, images, poses)
+            _, loss, states = model.train(session, images, poses, initial_states=states)
             print(f'loss={loss}')
 
 
