@@ -58,7 +58,6 @@ class VOModel(object):
             self.input_images = tf.placeholder(tf.float32, shape=[batch_size, sequence_length, h, w, 2 * c],
                                                name='imgs')
 
-
             self.target_poses = tf.placeholder(tf.float32, shape=[batch_size, sequence_length, 6],
                                                name='poses')
             # this placeholder is used for feeding both the cell and hidden states of both lstm
@@ -76,6 +75,7 @@ class VOModel(object):
         n_channels = [64, 128, 256, 256, 512, 512, 512, 512, 1024]
 
         self.cnn_activations = []
+        # we call cnn() in a loop, but the variables will be reused after first creation
         for idx in range(sequence_length):
             stacked_image = self.input_images[:, idx, :]
             self.cnn_activations.append(self.cnn(stacked_image,
@@ -122,16 +122,43 @@ class VOModel(object):
                                                      initial_state=(state1, state2),
                                                      sequence_length=[sequence_length] * batch_size)
             rnn_outputs = tf.reshape(tf.concat(rnn_outputs, 1),
-                                     [batch_size, sequence_length * memory_size])
+                                     [batch_size, sequence_length, memory_size])
 
         ############################################################################################
         #                                       Output layer                                       #
         ############################################################################################
         with tf.variable_scope('feedforward'):
-            n_rnn_output = rnn_outputs.get_shape()[-1]  # number of activations per batch
-            network_function = tf.layers.dense(rnn_outputs, kernel_initializer=tf.random_normal_initializer(stddev=np.sqrt(2 / n_rnn_output)))
+            n_rnn_output       = memory_size  # number of activations per batch
+            kernel_initializer = tf.random_normal_initializer(stddev=np.sqrt(2 / n_rnn_output))
+            # predictions
+            y = tf.layers.dense(rnn_outputs, 6, kernel_initializer=kernel_initializer)
+            # decompose into translational and rotational component
+            y_t, y_r = tf.split(y, 2, axis=2)
+            x_t, x_r = tf.split(self.target_poses, 2, axis=2)
 
-        self.loss = loss(network_function, target_poses)
+        self.loss = self.loss_function((x_t, x_r), (y_t, y_r))
+
+    def loss_function(self, targets, predictions, rot_weight=100):
+        '''Create MSE loss.
+
+        Parameters
+        ----------
+        targets :   tuple
+                    Tuple of two (batch_size, sequence_length, 3)-sized tensors, where the last
+                    dimension of the first element is the translation and the last dimension of the
+                    second element is the three euler angles
+        predictions :   tuple
+                    Tuple of two (batch_size, sequence_length, 3)-sized tensors, where the last
+                    dimension of the first element is the translation and the last dimension of the
+                    second element is the three euler angles
+        rot_weight  :   float
+                        Weight to scale the rotational error with. See paper equation (5)
+        '''
+        error_t = tf.losses.mean_squared_error(targets[0], predictions[0], reduction=tf.losses.Reduction.SUM)
+        error_r = tf.losses.mean_squared_error(targets[1], predictions[1], weights=rot_weight,
+                                               reduction=tf.losses.Reduction.SUM)
+        return error_r + error_t
+
 
     def cnn(self, input, ksizes, strides, n_channels, use_dropout=False, reuse=True):
         '''Create all the conv layers as specified in the paper.'''
@@ -197,7 +224,7 @@ class VOModel(object):
         if initial_states is None:
             initial_states = array_from_lstm_tuple(self.get_zero_state(session))
 
-        return session.run(self.cnn_activations, feed_dict={self.input_images: input_batch,
+        return session.run(self.loss, feed_dict={self.input_images: input_batch,
                                                             self.target_poses: pose_batch,
                                                             self.lstm_states: initial_states})
 

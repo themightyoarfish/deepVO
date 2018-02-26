@@ -34,7 +34,8 @@ def main():
     with tf.Session() as session:
         for images, poses in dm.batches():
             session.run(tf.global_variables_initializer())
-            model.get_rnn_output(session, images, poses)
+            loss = model.get_rnn_output(session, images, poses)
+            print(f'loss={loss}')
 
 
 if __name__ == '__main__':
