@@ -58,6 +58,7 @@ class VOModel(object):
             optimizer_spec = OptimizerSpec(kind='Adagrad', learning_rate=0.001)
         optimizer = optimizer_spec.create()
         self.is_training = is_training
+        self.batch_size = batch_size
         ############################################################################################
         #                                          Inputs                                          #
         ############################################################################################
@@ -183,7 +184,7 @@ class VOModel(object):
         error_t = tf.losses.mean_squared_error(targets[0], predictions[0], reduction=tf.losses.Reduction.SUM)
         error_r = tf.losses.mean_squared_error(targets[1], predictions[1], weights=rot_weight,
                                                reduction=tf.losses.Reduction.SUM)
-        return error_r + error_t
+        return (error_r + error_t) / self.batch_size
 
 
     def cnn(self, input, ksizes, strides, n_channels, use_dropout=False, reuse=True):
