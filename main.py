@@ -53,11 +53,12 @@ def main():
 
     with tf.Session() as session:
         session.run(tf.global_variables_initializer())
-        for _ in range(args.epochs):
+        for e in range(args.epochs):
+            print(f'Epoch {e}')
             states = None
             for images, poses in dm.batches():
                 _, loss, states = model.train(session, images, poses, initial_states=states)
-                print(f'loss={loss}')
+                print(f'\tloss={loss:04.5f}')
 
 
 if __name__ == '__main__':
