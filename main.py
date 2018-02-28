@@ -32,7 +32,11 @@ def main():
             help='Size of the lstm cell memory')
     parser.add_argument('-s', '--sequence-length', required=True, type=int,
             help='Length of the sequences used for training the RNN.')
+    parser.add_argument('-r', '--use-dropout', action='store_true', default=False,
+            help='Use dropout (during training)')
     args = parser.parse_args()
+    if args.use_dropout:
+        print('Use dropout')
 
     dm = DataManager(
                 dataset_path=args.dataset,
@@ -44,7 +48,8 @@ def main():
 
     # create model
     model = VOModel(image_shape, args.memory_size, args.sequence_length, args.batch_size,
-                    optimizer_spec=OptimizerSpec(kind=args.optimizer, learning_rate=args.learning_rate))
+                    optimizer_spec=OptimizerSpec(kind=args.optimizer, learning_rate=args.learning_rate),
+                                                 is_training=args.use_dropout)
 
     with tf.Session() as session:
         session.run(tf.global_variables_initializer())
