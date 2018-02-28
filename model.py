@@ -2,7 +2,7 @@ import tensorflow as tf
 from math import ceil
 from tensorflow.contrib.rnn import *
 import numpy as np
-from utils import tensor_from_lstm_tuple
+from utils import tensor_from_lstm_tuple, OptimizerSpec, resize_to_multiple
 
 
 class VOModel(object):
@@ -36,7 +36,13 @@ class VOModel(object):
 
     '''
 
-    def __init__(self, image_shape, memory_size, sequence_length, batch_size):
+    def __init__(self, image_shape,
+                 memory_size,
+                 sequence_length,
+                 batch_size,
+                 optimizer_spec=None,
+                 resize_images=False,
+                 is_training=True):
         '''
         Parameters
         ----------
@@ -48,7 +54,10 @@ class VOModel(object):
         batch_size  :   int
                         Size of the batches for training (necessary for RNN state)
         '''
-
+        if not optimizer_spec:
+            optimizer_spec = OptimizerSpec(kind='Adagrad', learning_rate=0.001)
+        optimizer = optimizer_spec.create()
+        self.is_training = is_training
         ############################################################################################
         #                                          Inputs                                          #
         ############################################################################################
@@ -57,6 +66,8 @@ class VOModel(object):
             # TODO: Resize images before stacking. Maybe do that outside of the graph?
             self.input_images = tf.placeholder(tf.float32, shape=[batch_size, sequence_length, h, w, 2 * c],
                                                name='imgs')
+            if resize_images:
+                self.input_images = resize_to_multiple(self.images, 64)
 
             self.target_poses = tf.placeholder(tf.float32, shape=[batch_size, sequence_length, 6],
                                                name='poses')
@@ -73,16 +84,26 @@ class VOModel(object):
         ksizes     = [7,  5,   5,   3,   3,   3,   3,   3,   3]
         strides    = [2,  2,   2,   1,   2,   1,   2,   1,   2]
         n_channels = [64, 128, 256, 256, 512, 512, 512, 512, 1024]
+        # TODO: Try different dropout schemes. On the small training set, every kind of dropout
+        # prevents convergence
+        n = len(ksizes)
+        keep_probs = np.linspace(0.5, 1, num=n)
+        lstm_keep_probs = [0.7, 0.8]
 
         self.cnn_activations = []
         # we call cnn() in a loop, but the variables will be reused after first creation
         for idx in range(sequence_length):
             stacked_image = self.input_images[:, idx, :]
-            self.cnn_activations.append(self.cnn(stacked_image,
-                                                 ksizes,
-                                                 strides,
-                                                 n_channels,
-                                                 reuse=tf.AUTO_REUSE))
+            cnn_activation = self.cnn(stacked_image,
+                                      ksizes,
+                                      strides,
+                                      n_channels,
+                                      reuse=tf.AUTO_REUSE)
+            if self.is_training:
+                self.cnn_activations.append(tf.nn.dropout(cnn_activation,
+                                                          keep_prob=keep_probs[idx]))
+            else:
+                self.cnn_activations.append(cnn_activation)
 
         # flatten cnn output for each batch element
         rnn_inputs = [tf.reshape(conv, [batch_size, -1])
@@ -93,34 +114,37 @@ class VOModel(object):
         ############################################################################################
         with tf.variable_scope('rnn'):
             '''Create all recurrent layers as specified in the paper.'''
+            lstm0 = LSTMCell(memory_size, state_is_tuple=True)
             lstm1 = LSTMCell(memory_size, state_is_tuple=True)
-            lstm2 = LSTMCell(memory_size, state_is_tuple=True)
-            rnn   = MultiRNNCell([lstm1, lstm2])
+            if self.is_training:
+                lstm0 = tf.contrib.rnn.DropoutWrapper(lstm0, output_keep_prob=lstm_keep_probs[0])
+                lstm1 = tf.contrib.rnn.DropoutWrapper(lstm1, output_keep_prob=lstm_keep_probs[1])
+            rnn = MultiRNNCell([lstm0, lstm1])
 
             self.zero_state = rnn.zero_state(batch_size, tf.float32)
 
             # first decompose state input into the two layers
-            states1 = self.lstm_states[0, ...]
-            states2 = self.lstm_states[1, ...]
+            states0 = self.lstm_states[0, ...]
+            states0 = self.lstm_states[1, ...]
 
             # then retrieve two memory_size-sized tensors from each state item
-            states1_list  = tf.unstack(states1, num=2)
+            states0_list  = tf.unstack(states0, num=2)
+            cell_state0   = states0_list[0]
+            hidden_state0 = states0_list[1]
+
+            states1_list  = tf.unstack(states0, num=2)
             cell_state1   = states1_list[0]
             hidden_state1 = states1_list[1]
 
-            states2_list  = tf.unstack(states2, num=2)
-            cell_state2   = states2_list[0]
-            hidden_state2 = states2_list[1]
-
             # finally, create the state tuples
+            state0 = LSTMStateTuple(c=hidden_state0, h=cell_state0)
             state1 = LSTMStateTuple(c=hidden_state1, h=cell_state1)
-            state2 = LSTMStateTuple(c=hidden_state2, h=cell_state2)
 
             rnn_outputs, rnn_state = static_rnn(rnn,
-                                                     rnn_inputs,
-                                                     dtype=tf.float32,
-                                                     initial_state=(state1, state2),
-                                                     sequence_length=[sequence_length] * batch_size)
+                                                rnn_inputs,
+                                                dtype=tf.float32,
+                                                initial_state=(state0, state1),
+                                                sequence_length=[sequence_length] * batch_size)
             rnn_outputs = tf.reshape(tf.concat(rnn_outputs, 1),
                                      [batch_size, sequence_length, memory_size])
             self.rnn_state = tensor_from_lstm_tuple(rnn_state)
@@ -138,7 +162,6 @@ class VOModel(object):
             x_t, x_r = tf.split(self.target_poses, 2, axis=2)
 
         self.loss = self.loss_function((x_t, x_r), (y_t, y_r))
-        optimizer = tf.train.AdagradOptimizer(0.001)
         self.train_step = optimizer.minimize(self.loss)
 
     def loss_function(self, targets, predictions, rot_weight=100):
