@@ -297,3 +297,95 @@ class DataManager(object):
         for i in range(0, num_poses):
             poses[i] = self.loadPose(ids[i])
         return poses
+
+
+class OptimizerSpec(dict):
+    '''Encapsulate all the info needed for creating any kind of optimizer. Learning rate scheduling
+    is fixed to exponential decay
+
+    Attributes
+    ----------
+    step_counter    :   Variable
+                        Counter to be passed to optimizer#minimize() so it gets incremented during
+                        each update
+    learning_rate   :   tf.train.piecewise_constant
+                        Learning rate of the optimizer (for later retrieval)
+
+    '''
+
+    def __init__(self, **kwargs):
+        '''
+        Parameters
+        ----------
+        kind    :   str
+                    Name of the optimizer
+        learning_rate   :   float
+                            Base learning rate used
+        name    :   str
+                    Optional name for the piecewise_constant operation
+        momentum    :   float
+                        Optional momentum for momentum optimizers
+        use_nesterov    :   bool
+                            Nesterov flag for momentum optimizer
+        steps   :   int (optional)
+                    Exponential decay steps
+        decay   :   int (optional)
+                    Exponential decay rate
+        '''
+        if not 'kind' in kwargs:
+            raise ValueError('No optimizer name given')
+        if not 'learning_rate' in kwargs:
+            raise ValueError('No base learning_rate given')
+        self.update(kwargs)
+        import tensorflow as tf
+        self.step_counter  = tf.Variable(0, trainable=False, dtype=tf.int32, name='step_counter')
+        rate               = kwargs['learning_rate']
+        # use exponential_decay
+        if 'steps' in kwargs and 'decay' in kwargs:
+            steps              = kwargs.get('steps')
+            decay              = kwargs.get('decay')
+            self.learning_rate = tf.train.exponential_decay(rate, self.step_counter, steps, decay)
+        else:   # plain learning
+            self.learning_rate = rate
+
+    def create(self):
+        '''Build the Optimizer object from the properties
+
+        Return
+        ------
+        tf.train.Optimizer
+            Ready-made optimizer
+        '''
+        kind          = self['kind']
+        learning_rate = self.learning_rate
+        name          = self.get('name', 'optimizer')
+        optimizer_cls = OptimizerSpec.get_optimizer(kind)
+        if kind in ['Momentum', 'RMSProp']:
+            # only those two use momentum param
+            try:
+                momentum = self['momentum']
+            except KeyError:
+                raise ValueError('Momentum parameter is necessary for MomentumOptimizer')
+            if kind == 'Momentum':
+                if 'use_nesterov' in self:
+                    use_nesterov = self['use_nesterov']
+                else:
+                    use_nesterov = False
+                return optimizer_cls(learning_rate, momentum, use_nesterov, name=name)
+            else:
+                return optimizer_cls(learning_rate, momentum, name=name)
+        else:
+            return optimizer_cls(learning_rate, name=name)
+
+    def __str__(self):
+        key_val_str = ', '.join(str(k) + '=' + str(v) for k, v in self.items())
+        return f'<Optimizer: {key_val_str}>'
+
+    @staticmethod
+    def get_optimizer(name):
+        import tensorflow as tf
+        if isinstance(name, tf.train.Optimizer):
+            return name
+        else:
+            return getattr(tf.train, name + 'Optimizer')
+
