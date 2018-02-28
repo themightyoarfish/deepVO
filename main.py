@@ -2,8 +2,10 @@
 
 import sys
 import numpy as np
+np.random.seed(1)
 from argparse import ArgumentParser
 import tensorflow as tf
+tf.set_random_seed(1)
 
 from model import VOModel
 from utils import DataManager
