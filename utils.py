@@ -1,5 +1,4 @@
 import numpy as np
-from matplotlib import pyplot as plt
 
 
 def tensor_from_lstm_tuple(tup):

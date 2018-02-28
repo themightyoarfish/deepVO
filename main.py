@@ -10,8 +10,6 @@ tf.set_random_seed(1)
 from model import VOModel
 from utils import DataManager, OptimizerSpec
 
-from matplotlib import pyplot as plt
-
 
 def main():
     tf_optimizers = {class_name[:-len('Optimizer')] for class_name in dir(tf.train) if 'Optimizer'
