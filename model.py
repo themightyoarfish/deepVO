@@ -329,4 +329,3 @@ class VOModel(object):
         # var_map = dict(zip(flow_var_names, cnn_vars))
         restorer = tf.train.Saver(cnn_vars)
         restorer.restore(session, filename)
-        __import__('ipdb').set_trace()

@@ -52,8 +52,8 @@ def main():
 
     with tf.Session() as session:
         session.run(tf.global_variables_initializer())
-        # if args.flownet:
-        #     model.load_flownet(session, args.flownet)
+        if args.flownet:
+            model.load_flownet(session, args.flownet)
         for e in range(args.epochs):
             print(f'Epoch {e}')
             states = None
