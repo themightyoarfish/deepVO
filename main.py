@@ -6,6 +6,7 @@ np.random.seed(1)
 from argparse import ArgumentParser
 import tensorflow as tf
 tf.set_random_seed(1)
+from os.path import join
 
 from model import VOModel
 from utils import DataManager, OptimizerSpec
@@ -47,10 +48,12 @@ def main():
     # create model
     model = VOModel(image_shape, args.memory_size, args.sequence_length, args.batch_size,
                     optimizer_spec=OptimizerSpec(kind=args.optimizer, learning_rate=args.learning_rate),
-                                                 is_training=args.use_dropout)
+                    is_training=args.use_dropout, use_flownet=args.flownet is not None)
 
     with tf.Session() as session:
         session.run(tf.global_variables_initializer())
+        # if args.flownet:
+        #     model.load_flownet(session, args.flownet)
         for e in range(args.epochs):
             print(f'Epoch {e}')
             states = None

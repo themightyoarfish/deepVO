@@ -388,3 +388,56 @@ class OptimizerSpec(dict):
         else:
             return getattr(tf.train, name + 'Optimizer')
 
+
+def conv_layer(input, channels_out, kernel_width, strides, activation, kernel_initializer,
+               bias_initializer, use_bias=True, padding='SAME',
+               var_names=(None, None)):
+    '''Create a convolutional layer with activation function and variable
+    initialisation.
+
+    Parameters
+    ----------
+    input   :   tf.Variable
+                Input to the layer
+    channels_out    :   int
+                    Number of output feature maps
+    kernel_width  :   int
+                Size of the convolution filter
+    strides :   tuple or int
+                Strides
+    activation  :   function
+                    Activation function
+    use_bias    :   bool
+    padding :   str
+                'SAME' or 'VALID'
+    var_names   :   tuple
+                Names of the weight and bias variables
+
+    Returns
+    -------
+    tf.Variable
+            The variable representing the layer activation
+
+    '''
+    import tensorflow as tf
+    if not activation:
+        activation = tf.identity
+    kernel_name = var_names[0] or 'kernels'
+    bias_name = var_names[1] or 'bias'
+    _, h, w, channels_in = input.shape
+    if isinstance(strides, int):
+        strides = (1, strides, strides, 1)
+    kernels = tf.get_variable(shape=(kernel_width, kernel_width, channels_in, channels_out),
+                              initializer=kernel_initializer, name=kernel_name)
+    if use_bias:
+        bias_shape = (channels_out,)
+        biases = tf.get_variable(shape=bias_shape, initializer=bias_initializer, name=bias_name)
+    conv = tf.nn.conv2d(
+        input,
+        kernels,
+        strides,
+        padding=padding)
+    if use_bias:
+        return activation(conv + biases)
+    else:
+        return activation(conv)
