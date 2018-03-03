@@ -190,6 +190,7 @@ def subtract_poses(pose_x, pose_y):
 import os
 from glob import glob
 from os.path import join
+from skimage.transform import resize
 
 class DataManager(object):
     def __init__(self,
@@ -197,7 +198,8 @@ class DataManager(object):
                  batch_size=10,
                  sequence_length=10,
                  debug=False,
-                 dtype=np.float32):
+                 dtype=np.float32,
+                 resize_to_width=None):
 
         if not os.path.exists(dataset_path):
             raise ValueError(f'Path {dataset_path} does not exist.')
@@ -217,6 +219,10 @@ class DataManager(object):
         self.pose_file_template  = join(self.poses_path, 'pose%0') + f'{self.num_dec_file}d.npy'
 
         init_image = self.loadImage(0)
+        if resize_to_width is not None:
+            width_ratio = resize_to_width / init_image.shape[1]
+            scaled_height = np.floor(init_image.shape[0] * width_ratio)
+            init_image = resize(init_image, output_shape=(scaled_height, resize_to_width))
 
         self.H = init_image.shape[0]
         self.W = init_image.shape[1]
@@ -270,18 +276,22 @@ class DataManager(object):
             yield self.batch_images, self.batch_poses
 
     def loadImage(self, id):
-        return np.squeeze(np.load(self.image_file_template % id))
+        img = np.squeeze(np.load(self.image_file_template % id))
+        return img
 
     def saveImage(self, id, img):
         np.save(self.image_file_template % id, img)
 
-    def loadImages(self, ids):
+    def loadImages(self, ids, resize_imgs=True):
         num_images = len(ids)
         images     = np.empty([num_images, self.H, self.W, self.C], dtype=self.dtype)
         for i in range(0, num_images):
             # right colors:
-            images[i] = self.loadImage(ids[i])
-
+            img = self.loadImage(ids[i])
+            if resize_imgs:
+                images[i] = resize(img, output_shape=(self.H, self.W))
+            else:
+                images[i] = img
         return images
 
     def loadPose(self, id):
