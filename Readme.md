@@ -2,6 +2,10 @@
 
 This is our submission for the ANN with TensorFlow course, winter 2017.
 
+## Data Acquisition
+In order to make use of the full 720 resolution of the LifeCam 3000, you must do two things
+- Tell the device driver to use this resolution via `v4l2-ctl --set-fmt-video=width=1280,height=720,pixelformat=1` (the pixel format is probably not important, but you may need to adjust the ros node accordingly)
+- In the `usb_cam_node`, set height and width parameters appropriately.
 
 ## Data Preprocessing
 ### Bagfile conversion
