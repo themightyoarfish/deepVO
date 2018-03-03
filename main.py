@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3.6
 
 import sys
 import numpy as np
@@ -41,7 +41,8 @@ def main():
                 dataset_path=args.dataset,
                 batch_size=args.batch_size,
                 sequence_length=args.sequence_length,
-                debug=True)
+                debug=True,
+                resize_to_width=800)
 
     image_shape = dm.getImageShape()
 
