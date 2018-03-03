@@ -33,16 +33,25 @@ def main():
             help='Length of the sequences used for training the RNN.')
     parser.add_argument('-r', '--use-dropout', action='store_true', default=False,
             help='Use dropout (during training)')
+    parser.add_argument('-w', '--width', type=int, required=False, default=0,
+            help='Resize images to long edge')
     args = parser.parse_args()
     if args.use_dropout:
         print('Use dropout')
 
-    dm = DataManager(
-                dataset_path=args.dataset,
-                batch_size=args.batch_size,
-                sequence_length=args.sequence_length,
-                debug=True,
-                resize_to_width=640)
+    if args.width == 0:
+        dm = DataManager(
+                    dataset_path=args.dataset,
+                    batch_size=args.batch_size,
+                    sequence_length=args.sequence_length,
+                    debug=True)
+    else:
+        dm = DataManager(
+                    dataset_path=args.dataset,
+                    batch_size=args.batch_size,
+                    sequence_length=args.sequence_length,
+                    debug=True,
+                    resize_to_width=args.width)
 
     image_shape = dm.getImageShape()
 

@@ -287,13 +287,13 @@ class DataManager(object):
     def saveImage(self, id, img):
         np.save(self.image_file_template % id, img)
 
-    def loadImages(self, ids, resize_imgs=True):
+    def loadImages(self, ids):
         num_images = len(ids)
         images     = np.empty([num_images, self.H, self.W, self.C], dtype=self.dtype)
         for i in range(0, num_images):
             # right colors:
             img = self.loadImage(ids[i])
-            if resize_imgs:
+            if img.shape != (self.H, self.W, self.C):
                 images[i] = resize(img, output_shape=(self.H, self.W))
             else:
                 images[i] = img

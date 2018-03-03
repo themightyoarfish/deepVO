@@ -8,7 +8,7 @@ from utils import DataManager, compute_rgb_mean
 
 
 def main():
-    parser = ArgumentParser('Preprocess robot data vor DeepVO')
+    parser = ArgumentParser('Preprocess robot data vor DeepVO, This process is destructive.')
     parser.add_argument('-d', '--data', type=str, required=True,
                         help='Path to dataset (a folder with "images" and "poses" subfolders.)')
     parser.add_argument('-f', '--to-float', required=False, default=False,
