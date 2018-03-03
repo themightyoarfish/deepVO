@@ -84,7 +84,7 @@ def add_pi_to_poses(data_manager):
     N = len(data_manager)
     for idx in range(N):
         pose = data_manager.loadPose(idx)
-        pose[...,3:5] = pose[...,3:5] + np.pi
+        pose[...,3:6] = pose[...,3:6] + np.pi
         data_manager.savePose(idx, pose)
 
 
