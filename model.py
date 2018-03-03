@@ -2,11 +2,11 @@ import tensorflow as tf
 from math import ceil
 from tensorflow.contrib.rnn import *
 import numpy as np
-from utils import tensor_from_lstm_tuple, OptimizerSpec, resize_to_multiple
+from utils import tensor_from_lstm_tuple, OptimizerSpec, resize_to_multiple, conv_layer
+from flownet import *
 
 
 class VOModel(object):
-
     '''Model class of the RCNN for visual odometry.
 
     Attributes
@@ -36,34 +36,46 @@ class VOModel(object):
 
     '''
 
-    def __init__(self, image_shape,
+    def __init__(self,
+                 image_shape,
                  memory_size,
                  sequence_length,
                  batch_size,
                  optimizer_spec=None,
                  resize_images=False,
-                 is_training=True):
+                 is_training=True,
+                 use_flownet=False):
         '''
         Parameters
         ----------
         image_shape :   tuple
         memory_size :   int
-                        LSTM state size
+                        LSTM state size (identical for both layers)
         sequence_length :   int
                             Length of the video stream
         batch_size  :   int
                         Size of the batches for training (necessary for RNN state)
+        optimizer_spec  :   OptimizerSpec
+                            Specification of the optimizer
+        resize_images   :   bool
+                            Rezise images to a multiple of 64
+        is_training :   bool
+                        Do not use dropout for LSTM cells
+        use_flownet :   bool
+                        Name CNN vars according to flownet naming scheme. You should call
+                        :py:meth:`load_flownet`  before pushing stuff through the graph.
         '''
         if not optimizer_spec:
             optimizer_spec = OptimizerSpec(kind='Adagrad', learning_rate=0.001)
         optimizer = optimizer_spec.create()
         self.is_training = is_training
+        self.batch_size = batch_size
+        self.use_flownet = use_flownet
         ############################################################################################
         #                                          Inputs                                          #
         ############################################################################################
         with tf.variable_scope('inputs'):
             h, w, c = image_shape
-            # TODO: Resize images before stacking. Maybe do that outside of the graph?
             self.input_images = tf.placeholder(tf.float32, shape=[batch_size, sequence_length, h, w, 2 * c],
                                                name='imgs')
             if resize_images:
@@ -75,7 +87,7 @@ class VOModel(object):
             # cells. The cell state comes before the hidden state
             N_lstm = 2
             self.lstm_states = tf.placeholder(tf.float32, shape=(N_lstm, 2,  batch_size, memory_size),
-                                               name='LSTM_states')
+                                              name='LSTM_states')
             self.sequence_length = sequence_length
 
         ############################################################################################
@@ -183,15 +195,15 @@ class VOModel(object):
         error_t = tf.losses.mean_squared_error(targets[0], predictions[0], reduction=tf.losses.Reduction.SUM)
         error_r = tf.losses.mean_squared_error(targets[1], predictions[1], weights=rot_weight,
                                                reduction=tf.losses.Reduction.SUM)
-        return error_r + error_t
-
+        return (error_r + error_t) / self.batch_size
 
     def cnn(self, input, ksizes, strides, n_channels, use_dropout=False, reuse=True):
         '''Create all the conv layers as specified in the paper.'''
 
         assert len(ksizes) == len(strides) == len(n_channels), ('Kernel, stride and channel specs '
                                                                 'must have same length')
-        with tf.variable_scope('cnn', reuse=True):
+        outer_scope_name = flownet_prefix if self.use_flownet else 'cnn'
+        with tf.variable_scope(outer_scope_name, reuse=reuse):
 
             # biases initialise with a small constant
             bias_initializer = tf.constant_initializer(0.01)
@@ -203,20 +215,33 @@ class VOModel(object):
             output = input
 
             for index, [ksize, stride, channels] in enumerate(zip(ksizes, strides, n_channels)):
-                with tf.variable_scope(f'conv{index}'):
+                inner_scope_name = flownet_layer_names[index] if self.use_flownet else f'conv{index}'
+                with tf.variable_scope(inner_scope_name):
                     # no relu for last layer
                     activation = tf.nn.relu if index < len(ksizes) - 1 else None
 
-                    output = tf.layers.conv2d(output,
-                                              channels,
-                                              kernel_size=[ksize, ksize],
-                                              strides=stride,
-                                              padding='SAME',
-                                              activation=activation,
-                                              kernel_initializer=kernel_initializer(ksize),
-                                              bias_initializer=bias_initializer,
-                                              reuse=reuse   # TODO: test if needed if set in parent scope
-                                              )
+                    if not self.use_flownet:
+                        output = tf.layers.conv2d(output,
+                                                  channels,
+                                                  kernel_size=[ksize, ksize],
+                                                  strides=stride,
+                                                  padding='SAME',
+                                                  activation=activation,
+                                                  kernel_initializer=kernel_initializer(ksize),
+                                                  bias_initializer=bias_initializer)
+                    else:
+                        bias_name = flownet_bias_suffix
+                        kernel_name = flownet_kernel_suffix
+                        output = conv_layer(output,
+                                            channels,
+                                            kernel_width=ksize,
+                                            strides=stride,
+                                            activation=activation,
+                                            kernel_initializer=kernel_initializer(ksize),
+                                            bias_initializer=bias_initializer,
+                                            use_bias=True,
+                                            padding='SAME',
+                                            var_names=(kernel_name, bias_name))
 
             return output
 
@@ -246,8 +271,8 @@ class VOModel(object):
                             Array of shape (2, 2, batch_size, memory_size)
         '''
         return session.run(self.loss, feed_dict={self.input_images: input_batch,
-                                                            self.target_poses: pose_batch,
-                                                            self.lstm_states: initial_states})
+                                                 self.target_poses: pose_batch,
+                                                 self.lstm_states: initial_states})
 
     def get_cnn_output(self, session, input_batch, pose_batch):
         '''Run some input through the cnn net.
@@ -283,6 +308,14 @@ class VOModel(object):
         if initial_states is None:
             initial_states = tensor_from_lstm_tuple(self.get_zero_state(session))
 
-        return session.run([self.train_step, self.loss, self.rnn_state], feed_dict={self.input_images: input_batch,
-                                                            self.target_poses: pose_batch,
-                                                            self.lstm_states: initial_states})
+        return session.run([self.train_step, self.loss, self.rnn_state],
+                           feed_dict={self.input_images: input_batch,
+                                      self.target_poses: pose_batch,
+                                      self.lstm_states: initial_states})
+
+    def load_flownet(self, session, filename):
+        global_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=flownet_prefix)
+        # hacky. Can we avoid having the optimizer pollute the scope with its ops?
+        cnn_vars = [var for var in global_vars if 'optimizer' not in var.name]
+        restorer = tf.train.Saver(cnn_vars)
+        restorer.restore(session, filename)
