@@ -21,3 +21,7 @@ This will create `images` and `poses` folders inside the chosen directory.
 Use the `preprocess_data.py` script with `-d <path-to-data>` and `-m` to
 subtract the mean value channel wise. Changes will be written back to the
 original files.
+
+## Potential Problems
+- We are not sure if the timestamps of pose and camera messages are correct and thus whether the training data is good enough
+- We have no control over the exposure time of the camera. Auto-exposure differences while driving around might make the problem more difficult
