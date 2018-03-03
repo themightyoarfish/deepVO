@@ -8,7 +8,7 @@ from utils import DataManager, compute_rgb_mean
 
 
 def main():
-    parser = ArgumentParser('Preprocess pluto data vor DeepVO')
+    parser = ArgumentParser('Preprocess robot data vor DeepVO')
     parser.add_argument('-d', '--data', type=str, required=True,
                         help='Path to dataset (a folder with "images" and "poses" subfolders.)')
     parser.add_argument('-f', '--to-float', required=False, default=False,
@@ -36,11 +36,13 @@ def show_imgs(data_manager):
     for idx in range(N):
         img = data_manager.loadImage(idx)
         minimum, maximum = img.min(), img.max()
+        print(f'Range: ({minimum}, {maximum})')
         plt.imshow((img - minimum) / (maximum - minimum))
         plt.show()
 
 
 def to_float(data_manager):
+    '''Convert dataset to range (0, 1)'''
     N = len(data_manager)
     print(f'Converting {data_manager.dataset_path}images/*.npy fo float ...')
     for idx in range(N):
@@ -49,12 +51,13 @@ def to_float(data_manager):
         if idx % 10 == 0:
             print(f'\r{idx+1:4d}/{N}', end='')
 
-        img = data_manager.loadImage(idx)
+        img = data_manager.loadImage(idx) / 255.
         data_manager.saveImage(idx, img.astype(np.float32))
     print('\nDone')
 
 
 def mean_normalize(data_manager):
+    '''Normalize data to the range -1 to 1'''
     assert data_manager.dtype == np.float32
     N = len(data_manager)
     print(f'Mean-normalizing {data_manager.dataset_path}/images/*.npy ...')
@@ -71,8 +74,9 @@ def mean_normalize(data_manager):
 
         if idx % 10 == 0:
             print(f'\r{idx+1:4d}/{N}', end='')
+
         img = data_manager.loadImage(idx)
-        data_manager.saveImage(idx, (img - mean_accumlator) / 255.0)
+        data_manager.saveImage(idx, (img - mean_accumlator))
     print('\nDone')
 
 
