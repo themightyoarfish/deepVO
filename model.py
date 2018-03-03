@@ -173,7 +173,7 @@ class VOModel(object):
             y_t, y_r = tf.split(y, 2, axis=2)
             x_t, x_r = tf.split(self.target_poses, 2, axis=2)
 
-        self.loss = self.loss_function((x_t, x_r), (y_t, y_r))
+        self.loss       = self.loss_function((x_t, x_r), (y_t, y_r))
         self.train_step = optimizer.minimize(self.loss)
 
     def loss_function(self, targets, predictions, rot_weight=100):
@@ -230,6 +230,8 @@ class VOModel(object):
                                                   kernel_initializer=kernel_initializer(ksize),
                                                   bias_initializer=bias_initializer)
                     else:
+                        # since we need control over the variable namings, we cannot use
+                        # tf.layers.conv2d
                         bias_name = flownet_bias_suffix
                         kernel_name = flownet_kernel_suffix
                         output = conv_layer(output,
@@ -252,6 +254,11 @@ class VOModel(object):
         ----------
         session :   tf.Session
                     Session to execute op in
+
+        Returns
+        -------
+        LSTMStateTuple
+            RNN zero state
         '''
         return session.run(self.zero_state)
 
@@ -269,10 +276,15 @@ class VOModel(object):
                         Array of shape (batch_size, sequence_length, 6) with Poses
         initial_states   :   np.ndarray
                             Array of shape (2, 2, batch_size, memory_size)
+
+        Returns
+        -------
+        tuple(np.ndarray)
+            Output of ``rnn_state`` operation (list of time steps)
         '''
-        return session.run(self.loss, feed_dict={self.input_images: input_batch,
-                                                 self.target_poses: pose_batch,
-                                                 self.lstm_states: initial_states})
+        return session.run(self.rnn_state, feed_dict={self.input_images: input_batch,
+                                                      self.target_poses: pose_batch,
+                                                      self.lstm_states: initial_states})
 
     def get_cnn_output(self, session, input_batch, pose_batch):
         '''Run some input through the cnn net.
@@ -286,6 +298,11 @@ class VOModel(object):
                         rgb images are stacked together.
         pose_batch :   np.ndarray
                         Array of shape (batch_size, sequence_length, 6) with Poses
+
+        Returns
+        -------
+        tuple(np.ndarray)
+            Outputs of ``cnn_activation`` for each time step
         '''
         return session.run(self.cnn_activations, feed_dict={self.input_images: input_batch,
                                                             self.target_poses: pose_batch})
@@ -304,6 +321,11 @@ class VOModel(object):
                         Array of shape (batch_size, sequence_length, 6) with Poses
         initial_states   :   np.ndarray
                             Array of shape (2, 2, batch_size, memory_size)
+
+        Returns
+        -------
+        tuple(np.ndarray)
+            Outputs of the ``train_step``, ``loss``, and ``rnn_state`` operations.
         '''
         if initial_states is None:
             initial_states = tensor_from_lstm_tuple(self.get_zero_state(session))
@@ -314,6 +336,17 @@ class VOModel(object):
                                       self.lstm_states: initial_states})
 
     def load_flownet(self, session, filename):
+        '''Load flownet weights into the conv net.
+
+        Parameters
+        ----------
+        session :   tf.Session
+                    Session to restore weights in
+        filename    :   str
+                        Base name of the checkpoints file (e.g ``"flownet-S.ckpt-0"`` if you have
+                        ``"flownet-S.ckpt-0.data-00000-of-00001"``, ``"flownet-S.ckpt-0.meta"``, and
+                        ``"flownet-S.ckpt-0.index"``)
+        '''
         global_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=flownet_prefix)
         # hacky. Can we avoid having the optimizer pollute the scope with its ops?
         cnn_vars = [var for var in global_vars if 'optimizer' not in var.name]
