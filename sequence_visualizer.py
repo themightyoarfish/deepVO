@@ -1,12 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-class Visualizer(object):
+class SequenceVisualizer(object):
 
     """This class visualizes the output of the network"""
 
     def __init__(self):
-        super(Visualizer, self).__init__()
+        super(SequenceVisualizer, self).__init__()
         # Define initial position to be (0,0)
         self.outputs  = []
         self.labels   = []
@@ -17,7 +17,7 @@ class Visualizer(object):
         self.outputs.append(np.copy(output))
         self.labels.append(np.copy(label))
 
-    def plot(self):
+    def plot_path(self):
         # If there is no or no new information do not plot.
         if len(self.outputs) == 0 or self.position == len(self.outputs):
             return
@@ -49,7 +49,7 @@ class Visualizer(object):
 
 
 def main():
-    vis = Visualizer()
+    vis = SequenceVisualizer()
     # generate pose data
     label = np.zeros(6)
     for i in range(20):
@@ -59,7 +59,7 @@ def main():
 
         # slightly change the output from the groundtruth position
         vis.add_data(output, label)
-    vis.plot()
+    vis.plot_path()
 
     for i in range(20):
         # imitate movement by adding random numbers
@@ -68,7 +68,7 @@ def main():
 
         # slightly change the output from the groundtruth position
         vis.add_data(output, label)
-    vis.plot()
+    vis.plot_path()
 
 
 if __name__ == "__main__":
