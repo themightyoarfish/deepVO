@@ -17,6 +17,8 @@ def main():
                         action='store_true', help='Subtract rgb mean from images')
     parser.add_argument('-s', '--show', required=False, default=False,
                         action='store_true', help='Show the images')
+    parser.add_argument('-p', '--pose', required=False, default=False,
+                        action='store_true', help='Add pi to poses (for range 0-2pi)')
     args = parser.parse_args()
 
     data_manager = DataManager(args.data, dtype=np.float32, batch_size=1, sequence_length=1)
@@ -28,6 +30,9 @@ def main():
 
     if args.show:
         show_imgs(data_manager)
+
+    if args.pose:
+        add_pi_to_poses(data_manager)
 
 
 def show_imgs(data_manager):
@@ -78,6 +83,13 @@ def mean_normalize(data_manager):
         img = data_manager.loadImage(idx)
         data_manager.saveImage(idx, (img - mean_accumlator))
     print('\nDone')
+
+def add_pi_to_poses(data_manager):
+    N = len(data_manager)
+    for idx in range(N):
+        pose = data_manager.loadPose(idx)
+        pose[...,3:6] = pose[...,3:6] + np.pi
+        data_manager.savePose(idx, pose)
 
 
 if __name__ == '__main__':
