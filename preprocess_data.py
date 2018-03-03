@@ -15,6 +15,8 @@ def main():
                         action='store_true', help='Convert images array to float')
     parser.add_argument('-m', '--mean-normalize', required=False, default=False,
                         action='store_true', help='Subtract rgb mean from images')
+    parser.add_argument('-s', '--show', required=False, default=False,
+                        action='store_true', help='Show the images')
     args = parser.parse_args()
 
     data_manager = DataManager(args.data, dtype=np.float32, batch_size=1, sequence_length=1)
@@ -23,6 +25,19 @@ def main():
 
     if args.mean_normalize:
         mean_normalize(data_manager)
+
+    if args.show:
+        show_imgs(data_manager)
+
+
+def show_imgs(data_manager):
+    from matplotlib import pyplot as plt
+    N = len(data_manager)
+    for idx in range(N):
+        img = data_manager.loadImage(idx)
+        minimum, maximum = img.min(), img.max()
+        plt.imshow((img - minimum) / (maximum - minimum))
+        plt.show()
 
 
 def to_float(data_manager):
@@ -40,8 +55,9 @@ def to_float(data_manager):
 
 
 def mean_normalize(data_manager):
+    assert data_manager.dtype == np.float32
     N = len(data_manager)
-    print(f'Mean-normalizing {data_manager.dataset_path}images/*.npy ...')
+    print(f'Mean-normalizing {data_manager.dataset_path}/images/*.npy ...')
     mean_accumlator = np.zeros((3,), dtype=np.float32)
 
     # run over entire dataset to compute mean (fucking inefficient but I have other shit to do)
@@ -56,11 +72,8 @@ def mean_normalize(data_manager):
         if idx % 10 == 0:
             print(f'\r{idx+1:4d}/{N}', end='')
         img = data_manager.loadImage(idx)
-        data_manager.saveImage(idx, img - mean_accumlator)
+        data_manager.saveImage(idx, (img - mean_accumlator) / 255.0)
     print('\nDone')
-
-
-
 
 
 if __name__ == '__main__':
