@@ -10,6 +10,7 @@ from os.path import join
 
 from model import VOModel
 from utils import DataManager, OptimizerSpec
+from performance_visualizer import PerformanceVisualizer
 
 
 def main():
