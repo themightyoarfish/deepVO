@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def tensor_from_lstm_tuple(tup):
+def tensor_from_lstm_tuple(tup, validate_shape=False):
     '''Create a tensor from a tuple of :py:class:`tf.contrib.rnn.LSTMStateTuple` s.
 
     Parameters
@@ -9,6 +9,10 @@ def tensor_from_lstm_tuple(tup):
     tup :   tuple(LSTMStateTuple)
             Tuple of N_lstm ``LSTMStateTuple`` s where each of the tuples has members of shape
             ``(batch_size, memory_size)``
+    validate_shape  :   bool
+                        Enforce identical shapes of all cell and memory states. This entails that
+                        all dimensions must be known. When using variable batch size, set to
+                        ``False`` and ensure the shapes are identical at runtime.
 
     Returns
     -------
@@ -16,24 +20,25 @@ def tensor_from_lstm_tuple(tup):
         Tensor of shape ``(N_lstm, 2, batch_size, memory_size)`` with cell and hidden states per lstm cell
         stacked together
     '''
-    import tensorflow as tf
+    # one state tuple has two members of shape (batch_size, memory_size)
+    N_lstm      = len(tup)
+    batch_size  = tup[0].c.shape[0]
+    memory_size = tup[0].c.shape[1]
+    # return value
+    array       = [[None, None]] * N_lstm
 
-    with tf.variable_scope('tuple_to_tensor'):
-        # one state tuple has two members of shape (batch_size, memory_size)
-        N_lstm      = len(tup)
-        batch_size  = tup[0].c.shape[0]
-        memory_size = tup[0].c.shape[1]
-        # return value
-        array       = [[None, None]] * N_lstm #tf.zeros((N_lstm, 2, batch_size, memory_size), dtype=tf.float32)
-
-        for lstm_idx in range(N_lstm):
-            lstm_state = tup[lstm_idx]
+    for lstm_idx in range(N_lstm):
+        lstm_state = tup[lstm_idx]
+        if validate_shape:
             if not ((batch_size, memory_size) == lstm_state.c.shape == lstm_state.h.shape):
                 raise ValueError('All states must have the same dimenstion.')
-            array[lstm_idx][0] = lstm_state.h  # cell state
-            array[lstm_idx][1] = lstm_state.c  # hidden state
+        else:
+            if not (memory_size == lstm_state.c.shape[1] == lstm_state.h.shape[1]):
+                raise ValueError('All states must have the same memory size.')
+        array[lstm_idx][0] = lstm_state.h  # cell state
+        array[lstm_idx][1] = lstm_state.c  # hidden state
 
-        return array
+    return array
 
 
 # q = x,y,z,w
@@ -183,13 +188,14 @@ def convert_large_array(file_in, file_out, dtype, factor=1.0):
 
 def subtract_poses(pose_x, pose_y):
     pose_diff = np.subtract(pose_x, pose_y)
-    pose_diff[..., 3:6] = np.arctan2( np.sin(pose_diff[..., 3:6]), np.cos(pose_diff[..., 3:6]) )
+    pose_diff[..., 3:6] = np.arctan2(np.sin(pose_diff[..., 3:6]), np.cos(pose_diff[..., 3:6]))
     return pose_diff
 
 
 import os
 from glob import glob
 from os.path import join
+from skimage.transform import resize
 
 class DataManager(object):
     def __init__(self,
@@ -197,7 +203,8 @@ class DataManager(object):
                  batch_size=10,
                  sequence_length=10,
                  debug=False,
-                 dtype=np.float32):
+                 dtype=np.float32,
+                 resize_to_width=None):
 
         if not os.path.exists(dataset_path):
             raise ValueError(f'Path {dataset_path} does not exist.')
@@ -217,6 +224,10 @@ class DataManager(object):
         self.pose_file_template  = join(self.poses_path, 'pose%0') + f'{self.num_dec_file}d.npy'
 
         init_image = self.loadImage(0)
+        if resize_to_width is not None:
+            width_ratio = resize_to_width / init_image.shape[1]
+            scaled_height = np.floor(init_image.shape[0] * width_ratio)
+            init_image = resize(init_image, output_shape=(scaled_height, resize_to_width))
 
         self.H = init_image.shape[0]
         self.W = init_image.shape[1]
@@ -270,7 +281,8 @@ class DataManager(object):
             yield self.batch_images, self.batch_poses
 
     def loadImage(self, id):
-        return np.squeeze(np.load(self.image_file_template % id))
+        img = np.squeeze(np.load(self.image_file_template % id))
+        return img
 
     def saveImage(self, id, img):
         np.save(self.image_file_template % id, img)
@@ -280,8 +292,11 @@ class DataManager(object):
         images     = np.empty([num_images, self.H, self.W, self.C], dtype=self.dtype)
         for i in range(0, num_images):
             # right colors:
-            images[i] = self.loadImage(ids[i])
-
+            img = self.loadImage(ids[i])
+            if img.shape != (self.H, self.W, self.C):
+                images[i] = resize(img, output_shape=(self.H, self.W))
+            else:
+                images[i] = img
         return images
 
     def loadPose(self, id):
@@ -391,7 +406,7 @@ class OptimizerSpec(dict):
 
 def conv_layer(input, channels_out, kernel_width, strides, activation, kernel_initializer,
                bias_initializer, use_bias=True, padding='SAME',
-               var_names=(None, None)):
+               var_names=(None, None), trainable=True):
     '''Create a convolutional layer with activation function and variable
     initialisation.
 
@@ -412,6 +427,7 @@ def conv_layer(input, channels_out, kernel_width, strides, activation, kernel_in
                 'SAME' or 'VALID'
     var_names   :   tuple
                 Names of the weight and bias variables
+    trainable   :   bool
 
     Returns
     -------
@@ -428,10 +444,11 @@ def conv_layer(input, channels_out, kernel_width, strides, activation, kernel_in
     if isinstance(strides, int):
         strides = (1, strides, strides, 1)
     kernels = tf.get_variable(shape=(kernel_width, kernel_width, channels_in, channels_out),
-                              initializer=kernel_initializer, name=kernel_name)
+                              initializer=kernel_initializer, name=kernel_name, trainable=trainable)
     if use_bias:
         bias_shape = (channels_out,)
-        biases = tf.get_variable(shape=bias_shape, initializer=bias_initializer, name=bias_name)
+        biases = tf.get_variable(shape=bias_shape, initializer=bias_initializer, name=bias_name,
+                                 trainable=trainable)
     conv = tf.nn.conv2d(
         input,
         kernels,

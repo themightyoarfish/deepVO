@@ -40,7 +40,6 @@ class VOModel(object):
                  image_shape,
                  memory_size,
                  sequence_length,
-                 batch_size,
                  optimizer_spec=None,
                  resize_images=False,
                  is_training=True,
@@ -53,8 +52,6 @@ class VOModel(object):
                         LSTM state size (identical for both layers)
         sequence_length :   int
                             Length of the video stream
-        batch_size  :   int
-                        Size of the batches for training (necessary for RNN state)
         optimizer_spec  :   OptimizerSpec
                             Specification of the optimizer
         resize_images   :   bool
@@ -69,26 +66,26 @@ class VOModel(object):
             optimizer_spec = OptimizerSpec(kind='Adagrad', learning_rate=0.001)
         optimizer = optimizer_spec.create()
         self.is_training = is_training
-        self.batch_size = batch_size
         self.use_flownet = use_flownet
         ############################################################################################
         #                                          Inputs                                          #
         ############################################################################################
         with tf.variable_scope('inputs'):
             h, w, c = image_shape
-            self.input_images = tf.placeholder(tf.float32, shape=[batch_size, sequence_length, h, w, 2 * c],
+            self.input_images = tf.placeholder(tf.float32, shape=[None, sequence_length, h, w, 2 * c],
                                                name='imgs')
             if resize_images:
                 self.input_images = resize_to_multiple(self.images, 64)
 
-            self.target_poses = tf.placeholder(tf.float32, shape=[batch_size, sequence_length, 6],
+            self.target_poses = tf.placeholder(tf.float32, shape=[None, sequence_length, 6],
                                                name='poses')
             # this placeholder is used for feeding both the cell and hidden states of both lstm
             # cells. The cell state comes before the hidden state
             N_lstm = 2
-            self.lstm_states = tf.placeholder(tf.float32, shape=(N_lstm, 2,  batch_size, memory_size),
+            self.lstm_states = tf.placeholder(tf.float32, shape=(N_lstm, 2, None, memory_size),
                                               name='LSTM_states')
             self.sequence_length = sequence_length
+            self.batch_size = tf.placeholder(tf.int32, shape=[])
 
         ############################################################################################
         #                                       Convolutions                                       #
@@ -117,8 +114,11 @@ class VOModel(object):
             else:
                 self.cnn_activations.append(cnn_activation)
 
+        def num_activations(conv):
+            return np.prod(conv.shape[1:].as_list())
+
         # flatten cnn output for each batch element
-        rnn_inputs = [tf.reshape(conv, [batch_size, -1])
+        rnn_inputs = [tf.reshape(conv, [self.batch_size, num_activations(conv)])
                       for conv in self.cnn_activations]
 
         ############################################################################################
@@ -131,9 +131,8 @@ class VOModel(object):
             if self.is_training:
                 lstm0 = tf.contrib.rnn.DropoutWrapper(lstm0, output_keep_prob=lstm_keep_probs[0])
                 lstm1 = tf.contrib.rnn.DropoutWrapper(lstm1, output_keep_prob=lstm_keep_probs[1])
-            rnn = MultiRNNCell([lstm0, lstm1])
-
-            self.zero_state = rnn.zero_state(batch_size, tf.float32)
+            self.rnn = MultiRNNCell([lstm0, lstm1])
+            self.zero_state = self.rnn.zero_state(self.batch_size, tf.float32)
 
             # first decompose state input into the two layers
             states0 = self.lstm_states[0, ...]
@@ -152,13 +151,14 @@ class VOModel(object):
             state0 = LSTMStateTuple(c=hidden_state0, h=cell_state0)
             state1 = LSTMStateTuple(c=hidden_state1, h=cell_state1)
 
-            rnn_outputs, rnn_state = static_rnn(rnn,
+            sequence_lengths = tf.ones((self.batch_size,), dtype=tf.int32) * sequence_length
+            rnn_outputs, rnn_state = static_rnn(self.rnn,
                                                 rnn_inputs,
                                                 dtype=tf.float32,
                                                 initial_state=(state0, state1),
-                                                sequence_length=[sequence_length] * batch_size)
+                                                sequence_length=sequence_lengths)
             rnn_outputs = tf.reshape(tf.concat(rnn_outputs, 1),
-                                     [batch_size, sequence_length, memory_size])
+                                     [self.batch_size, sequence_length, memory_size])
             self.rnn_state = tensor_from_lstm_tuple(rnn_state)
 
         ############################################################################################
@@ -195,7 +195,7 @@ class VOModel(object):
         error_t = tf.losses.mean_squared_error(targets[0], predictions[0], reduction=tf.losses.Reduction.SUM)
         error_r = tf.losses.mean_squared_error(targets[1], predictions[1], weights=rot_weight,
                                                reduction=tf.losses.Reduction.SUM)
-        return (error_r + error_t) / self.batch_size
+        return (error_r + error_t) / tf.cast(self.batch_size, tf.float32)
 
     def cnn(self, input, ksizes, strides, n_channels, use_dropout=False, reuse=True):
         '''Create all the conv layers as specified in the paper.'''
@@ -230,6 +230,8 @@ class VOModel(object):
                                                   kernel_initializer=kernel_initializer(ksize),
                                                   bias_initializer=bias_initializer)
                     else:
+                        # since we need control over the variable namings, we cannot use
+                        # tf.layers.conv2d
                         bias_name = flownet_bias_suffix
                         kernel_name = flownet_kernel_suffix
                         output = conv_layer(output,
@@ -241,19 +243,26 @@ class VOModel(object):
                                             bias_initializer=bias_initializer,
                                             use_bias=True,
                                             padding='SAME',
-                                            var_names=(kernel_name, bias_name))
+                                            var_names=(kernel_name, bias_name),
+                                            trainable=False)
 
             return output
 
-    def get_zero_state(self, session):
+    def get_zero_state(self, session, batch_size):
         '''Obtain the RNN zero state.
 
         Parameters
         ----------
         session :   tf.Session
                     Session to execute op in
+
+        Returns
+        -------
+        LSTMStateTuple
+            RNN zero state
         '''
-        return session.run(self.zero_state)
+
+        return session.run(self.zero_state, feed_dict={self.batch_size: batch_size})
 
     def get_rnn_output(self, session, input_batch, pose_batch, initial_states=None):
         '''Run some input through the cnn net, followed by the rnn net
@@ -269,10 +278,17 @@ class VOModel(object):
                         Array of shape (batch_size, sequence_length, 6) with Poses
         initial_states   :   np.ndarray
                             Array of shape (2, 2, batch_size, memory_size)
+
+        Returns
+        -------
+        tuple(np.ndarray)
+            Output of ``rnn_state`` operation (list of time steps)
         '''
-        return session.run(self.loss, feed_dict={self.input_images: input_batch,
-                                                 self.target_poses: pose_batch,
-                                                 self.lstm_states: initial_states})
+        batch_size = input_batch.shape[0]
+        return session.run(self.rnn_state, feed_dict={self.batch_size: batch_size,
+                                                      self.input_images: input_batch,
+                                                      self.target_poses: pose_batch,
+                                                      self.lstm_states: initial_states})
 
     def get_cnn_output(self, session, input_batch, pose_batch):
         '''Run some input through the cnn net.
@@ -286,6 +302,11 @@ class VOModel(object):
                         rgb images are stacked together.
         pose_batch :   np.ndarray
                         Array of shape (batch_size, sequence_length, 6) with Poses
+
+        Returns
+        -------
+        tuple(np.ndarray)
+            Outputs of ``cnn_activation`` for each time step
         '''
         return session.run(self.cnn_activations, feed_dict={self.input_images: input_batch,
                                                             self.target_poses: pose_batch})
@@ -304,9 +325,16 @@ class VOModel(object):
                         Array of shape (batch_size, sequence_length, 6) with Poses
         initial_states   :   np.ndarray
                             Array of shape (2, 2, batch_size, memory_size)
+
+        Returns
+        -------
+        tuple(np.ndarray)
+            Outputs of the ``train_step``, ``loss``, and ``rnn_state`` operations.
         '''
+        batch_size = input_batch.shape[0]
+
         if initial_states is None:
-            initial_states = tensor_from_lstm_tuple(self.get_zero_state(session))
+            initial_states = tensor_from_lstm_tuple(self.get_zero_state(session, batch_size))
 
         if return_prediction:
             return session.run([self.y_t, self.y_r, 
@@ -321,8 +349,34 @@ class VOModel(object):
                                           self.lstm_states: initial_states})
 
     def load_flownet(self, session, filename):
+        '''Load flownet weights into the conv net.
+
+        Parameters
+        ----------
+        session :   tf.Session
+                    Session to restore weights in
+        filename    :   str
+                        Base name of the checkpoints file (e.g ``"flownet-S.ckpt-0"`` if you have
+                        ``"flownet-S.ckpt-0.data-00000-of-00001"``, ``"flownet-S.ckpt-0.meta"``, and
+                        ``"flownet-S.ckpt-0.index"``)
+        '''
         global_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=flownet_prefix)
         # hacky. Can we avoid having the optimizer pollute the scope with its ops?
         cnn_vars = [var for var in global_vars if 'optimizer' not in var.name]
         restorer = tf.train.Saver(cnn_vars)
         restorer.restore(session, filename)
+
+    def test(self, session, input_batch, pose_batch):
+        '''Get network predictions for some input sequence and compute average error.
+
+        Parameters
+        ----------
+        session :   tf.Session
+                    Session to run ops in
+        input_batch  :  np.ndarray
+                        Array of shape (batch_size, sequence_length, h, w, 6) where two consecutive
+                        rgb images are stacked together.
+        pose_batch  :   np.ndarray
+                        Array of shape (batch_size, sequence_length, 6) with Poses
+        '''
+        pass

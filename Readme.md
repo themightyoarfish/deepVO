@@ -2,6 +2,10 @@
 
 This is our submission for the ANN with TensorFlow course, winter 2017.
 
+## Data Acquisition
+In order to make use of the full 720 resolution of the LifeCam 3000, you must do two things
+- Tell the device driver to use this resolution via `v4l2-ctl --set-fmt-video=width=1280,height=720,pixelformat=1` (the pixel format is probably not important, but you may need to adjust the ros node accordingly)
+- In the `usb_cam_node`, set height and width parameters appropriately.
 
 ## Data Preprocessing
 ### Bagfile conversion
@@ -14,6 +18,14 @@ The `-P` flag is to dump one npy file for each image and pose. The `-x`
 flag is for writing float image arrays instead of uint8.
 This will create `images` and `poses` folders inside the chosen directory.
 ### Further preprocessing
-Use the `preprocess_data.py` script with `-d <path-to-data>` and `-m` to
-subtract the mean value channel wise. Changes will be written back to the
-original files.
+Use the `preprocess_data.py` script to prepare the data for our network
+* with `-d <path-to-data>` you give it the path where the `images/` and
+  `poses/` folders are located. *All modifications are done in-place*
+* `-f` will map the images to (0, 1)
+* `-m` will subtract the mean (over the entire set) from each image
+* `-p` will add Pi to all pose angles. The robot's EKF output is in the
+  range (-pi, pi), but we want (0, 2pi)
+
+## Potential Problems
+- We are not sure if the timestamps of pose and camera messages are correct and thus whether the training data is good enough
+- We have no control over the exposure time of the camera. Auto-exposure differences while driving around might make the problem more difficult

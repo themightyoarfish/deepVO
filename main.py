@@ -1,11 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3.6
 
 import sys
 import numpy as np
-np.random.seed(1)
+# np.random.seed(1)
 from argparse import ArgumentParser
 import tensorflow as tf
-tf.set_random_seed(1)
+# tf.set_random_seed(1)
 from os.path import join
 
 from model import VOModel
@@ -35,22 +35,36 @@ def main():
             help='Use dropout (during training)')
     parser.add_argument('-v', '--visualize-displacement', action='store_true', default=False,
             help='Plot the percentage of translational and rotational displacement')
+    parser.add_argument('-w', '--width', type=int, required=False, default=0,
+            help='Resize images to long edge')
     args = parser.parse_args()
     if args.use_dropout:
         print('Use dropout')
 
-    dm = DataManager(
-                dataset_path=args.dataset,
-                batch_size=args.batch_size,
-                sequence_length=args.sequence_length,
-                debug=True)
+    if args.width == 0:
+        dm = DataManager(
+                    dataset_path=args.dataset,
+                    batch_size=args.batch_size,
+                    sequence_length=args.sequence_length,
+                    debug=True)
+    else:
+        dm = DataManager(
+                    dataset_path=args.dataset,
+                    batch_size=args.batch_size,
+                    sequence_length=args.sequence_length,
+                    debug=True,
+                    resize_to_width=args.width)
 
     image_shape = dm.getImageShape()
 
     # create model
-    model = VOModel(image_shape, args.memory_size, args.sequence_length, args.batch_size,
-                    optimizer_spec=OptimizerSpec(kind=args.optimizer, learning_rate=args.learning_rate),
-                    is_training=args.use_dropout, use_flownet=args.flownet is not None)
+    optimizer_spec = OptimizerSpec(kind=args.optimizer, learning_rate=args.learning_rate)
+    model = VOModel(image_shape,
+                    args.memory_size,
+                    args.sequence_length,
+                    optimizer_spec=optimizer_spec,
+                    is_training=args.use_dropout,
+                    use_flownet=args.flownet is not None)
 
     with tf.Session() as session:
         session.run(tf.global_variables_initializer())
