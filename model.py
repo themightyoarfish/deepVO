@@ -170,10 +170,10 @@ class VOModel(object):
             # predictions
             y = tf.layers.dense(rnn_outputs, 6, kernel_initializer=kernel_initializer)
             # decompose into translational and rotational component
-            y_t, y_r = tf.split(y, 2, axis=2)
-            x_t, x_r = tf.split(self.target_poses, 2, axis=2)
+            self.y_t, self.y_r = tf.split(y, 2, axis=2)
+            self.x_t, self.x_r = tf.split(self.target_poses, 2, axis=2)
 
-        self.loss = self.loss_function((x_t, x_r), (y_t, y_r))
+        self.loss = self.loss_function((self.x_t, self.x_r), (self.y_t, self.y_r))
         self.train_step = optimizer.minimize(self.loss)
 
     def loss_function(self, targets, predictions, rot_weight=100):
@@ -290,7 +290,7 @@ class VOModel(object):
         return session.run(self.cnn_activations, feed_dict={self.input_images: input_batch,
                                                             self.target_poses: pose_batch})
 
-    def train(self, session, input_batch, pose_batch, initial_states=None):
+    def train(self, session, input_batch, pose_batch, initial_states=None, return_prediction=False):
         '''Train the network.
 
         Parameters
@@ -308,10 +308,17 @@ class VOModel(object):
         if initial_states is None:
             initial_states = tensor_from_lstm_tuple(self.get_zero_state(session))
 
-        return session.run([self.train_step, self.loss, self.rnn_state],
-                           feed_dict={self.input_images: input_batch,
-                                      self.target_poses: pose_batch,
-                                      self.lstm_states: initial_states})
+        if return_prediction:
+            return session.run([self.y_t, self.y_r, 
+                                self.train_step, self.loss, self.rnn_state],
+                               feed_dict={self.input_images: input_batch,
+                                          self.target_poses: pose_batch,
+                                          self.lstm_states: initial_states})
+        else:
+            return session.run([self.train_step, self.loss, self.rnn_state],
+                               feed_dict={self.input_images: input_batch,
+                                          self.target_poses: pose_batch,
+                                          self.lstm_states: initial_states})
 
     def load_flownet(self, session, filename):
         global_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=flownet_prefix)

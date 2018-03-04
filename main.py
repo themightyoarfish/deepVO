@@ -33,6 +33,8 @@ def main():
             help='Length of the sequences used for training the RNN.')
     parser.add_argument('-r', '--use-dropout', action='store_true', default=False,
             help='Use dropout (during training)')
+    parser.add_argument('-v', '--visualize-displacement', action='store_true', default=False,
+            help='Plot the percentage of translational and rotational displacement')
     args = parser.parse_args()
     if args.use_dropout:
         print('Use dropout')
@@ -57,10 +59,18 @@ def main():
         for e in range(args.epochs):
             print(f'Epoch {e}')
             states = None
+            if args.visualize_displacement:
+                visualizer = PerformanceVisualizer()
             for images, poses in dm.batches():
-                _, loss, states = model.train(session, images, poses, initial_states=states)
+                if args.visualize_displacement:
+                    y_t, y_r, _, loss, states = model.train(session, images, poses, initial_states=states, return_prediction=True)
+                    visualizer.add_translation_batch(y_t, poses[:,:,:3])
+                    visualizer.add_rotation_batch(y_r, poses[:,:,3:])
+                else:
+                    _, loss, states = model.train(session, images, poses, initial_states=states)
                 print(f'\tloss={loss:04.5f}')
-
+            if args.visualize_displacement:
+                visualizer.plot()
 
 if __name__ == '__main__':
     main()
