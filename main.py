@@ -8,6 +8,7 @@ import tensorflow as tf
 # tf.set_random_seed(1)
 from os.path import join
 import os.path
+import os
 
 from model import VOModel
 from utils import DataManager, OptimizerSpec
@@ -67,7 +68,11 @@ def main():
 
     saver = tf.train.Saver()
 
-    model_filename = './deepVOmodel.ckpt'
+
+
+    model_filename = 'deepVOmodel.ckpt'
+
+    model_filename = path = os.path.join(os.getcwd(), 'deepVOmodel.ckpt')
 
     with tf.Session() as session:
 
@@ -89,7 +94,7 @@ def main():
             # Save the variables to disk.
 
             save_path = saver.save(session, model_filename)
-            print("Model saved in file: %s" % save_path)
+            print("Model saved in file: %s" % model_filename)
 
 
 if __name__ == '__main__':
