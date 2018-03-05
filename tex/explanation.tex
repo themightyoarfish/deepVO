@@ -25,7 +25,22 @@
 \label{sec:introduction}
 % TODO: Explain how visual odometry is useful
 % TODO: Explain the structure of this paper
-\lipsum
+In robotics the localization of a robot within its environment is an essential task. Especially in the days of autonomously driving vehicles this field of research receives a significant amount of attention. There are many ways to perform robot localization and usually several methods are used at the same time in order to improve reliability of the whole system. The main task of a localization algorithm is to repeatedly estimate the current pose of the robot. A pose is a 6-\emph{d} vector containing the $x$, $y$, $z$ positional values, as well as the \emph{yaw}, \emph{pitch}, and \emph{roll} values representing the rotation of the robot.
+
+One approach of relative localization is \emph{odometry}. In most applications odometry denotes the usage of wheel or motor movement data for estimating the change in position over time (similar method to the speed estimation in a car). As just mentioned this method only provides relative localization which in this case means that the starting point of the robot is used as a reference position. In other words all estimated poses are in a coordinate system which is initially defined by the starting pose. Figure~\ref{fig:reference_frame} depicts a graphical explanation of the localization algorithm where the arrows show the change of the position over time.
+
+\begin{figure}[tbh]
+    \centering
+    \includegraphics[width=0.2\linewidth]{reference_frame.pdf}
+    \caption{Graphical explanation of the estimated positions of the robot over time. The starting position defines the center of the reference coordinate system.}
+    \label{fig:reference_frame}
+\end{figure}
+
+Another relative localization approach is \emph{visual} odometry which tries to fulfill the same goal as simple odometry but instead of motor or wheel movements, it uses camera images. Classic approaches use techniques like optical flow between successive images in order to determine a direction of movement between those two points in time. Usually these approaches try to find similar regions in both images and often make use of image features.
+
+The method we are going to present in this work is a visual odometry-based approach but uses deep learning for determining the change of movement between successive images. The original paper by Wang~\etal~\cite{wang2017deepvo} was published in 2017 and describes the structure of a deep neural network, called \emph{DeepVO}, and presents its performance on the well-known KITTI dataset which contains camera images and pose estimations of a car (a detailed explanation is given in section~\ref{sec:deepvo:original}.
+
+This paper is structured as follows. Section~\ref{sec:deepvo:original} presents the idea and structure of the DeepVO Network and Section~\ref{sec:deepvo:approach} gives a short explanation of how we implemented it in TensorFlow. Section~\ref{sec:evaluation:data} will elaborate on how we gathered data for training and testing. In Section~\ref{sec:evaluation:results} we present the training behavior and performance results of the our DeepVO implementation.
 
 
 % --------------- %
@@ -42,17 +57,15 @@
 \subsection{Original Paper}
 \label{sec:deepvo:original}
 % TODO: Explain the deepVO model
-\lipsum
 
 
 % -------------------- %
 % SUBSECTION: APPROACH %
 % -------------------- %
 \subsection{Our Approach}
-\label{sec:approach}
+\label{sec:deepvo:approach}
 % TODO: Explain how we implemented the model described in the paper
 % TODO: --> This includes other implementations we found on the web? or problems we had, or simply stuff we did'nt know better
-\lipsum
 
 
 % ------------------- %
