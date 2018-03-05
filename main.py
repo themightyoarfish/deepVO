@@ -76,7 +76,7 @@ def main():
         if args.flownet:
             model.load_flownet(session, args.flownet)
 
-        if( os.path.isfile(model_name) ):
+        if( os.path.isfile(model_filename) ):
             saver.restore(session, model_filename)
             print("Model restored.")
 
