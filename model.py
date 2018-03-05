@@ -195,10 +195,12 @@ class VOModel(object):
         rot_weight  :   float
                         Weight to scale the rotational error with. See paper equation (5)
         '''
-        error_t = tf.losses.mean_squared_error(targets[0], predictions[0], reduction=tf.losses.Reduction.SUM)
+        error_t = tf.losses.mean_squared_error(targets[0], predictions[0], reduction=tf.losses.Reduction.MEAN)
+        # TODO: Think about the case where the target is at -pi and the prediction at +pi. Does this
+        # happen?
         error_r = tf.losses.mean_squared_error(targets[1], predictions[1], weights=rot_weight,
-                                               reduction=tf.losses.Reduction.SUM)
-        return (error_r + error_t) / tf.cast(self.batch_size, tf.float32)
+                                               reduction=tf.losses.Reduction.MEAN)
+        return error_r + error_t
 
     def cnn(self, input, ksizes, strides, n_channels, use_dropout=False, reuse=True):
         '''Create all the conv layers as specified in the paper.'''

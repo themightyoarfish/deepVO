@@ -40,20 +40,20 @@ def main():
         print('Use dropout')
 
     if args.width == 0:
-        dm = DataManager(
+        dm_train = DataManager(
                     dataset_path=args.dataset,
                     batch_size=args.batch_size,
                     sequence_length=args.sequence_length,
                     debug=True)
     else:
-        dm = DataManager(
+        dm_train = DataManager(
                     dataset_path=args.dataset,
                     batch_size=args.batch_size,
                     sequence_length=args.sequence_length,
                     debug=True,
                     resize_to_width=args.width)
 
-    image_shape = dm.getImageShape()
+    image_shape = dm_train.getImageShape()
 
     # create model
     optimizer_spec = OptimizerSpec(kind=args.optimizer, learning_rate=args.learning_rate)
@@ -71,9 +71,21 @@ def main():
         for e in range(args.epochs):
             print(f'Epoch {e}')
             states = None
-            for images, poses in dm.batches():
+            for images, poses in dm_train.batches():
                 _, loss, states = model.train(session, images, poses, initial_states=states)
                 print(f'\tloss={loss:04.5f}')
+
+        # loss = 0
+        # count = 0
+        # states = None
+        # for images, poses in dm_train.batches():
+        #     y_t, y_r, _loss, states = model.test(session, images, poses, initial_states=states)
+        #     loss += _loss
+        #     count += 1
+
+        # loss /= count
+        # print('Average loss per batch: {loss}')
+
 
 
 if __name__ == '__main__':
