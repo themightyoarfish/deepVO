@@ -7,6 +7,7 @@ from argparse import ArgumentParser
 import tensorflow as tf
 # tf.set_random_seed(1)
 from os.path import join
+import os.path
 
 from model import VOModel
 from utils import DataManager, OptimizerSpec
