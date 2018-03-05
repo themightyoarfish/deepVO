@@ -80,7 +80,7 @@ def main():
                 count += 1
 
             avg_loss /= count
-            print(f'Average test loss across batches: {avg_loss:04.5f}')
+            print(f'Average test loss across {count} batches: {avg_loss:04.5f}')
 
 
 if __name__ == '__main__':
