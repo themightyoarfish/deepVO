@@ -75,6 +75,7 @@ class VOModel(object):
         optimizer = optimizer_spec.create()
         self.use_dropout = use_dropout
         self.use_flownet = use_flownet
+        self.sequence_length = sequence_length
         ############################################################################################
         #                                          Inputs                                          #
         ############################################################################################
@@ -92,8 +93,7 @@ class VOModel(object):
             N_lstm = 2
             self.lstm_states = tf.placeholder(tf.float32, shape=(N_lstm, 2, None, memory_size),
                                               name='LSTM_states')
-            self.sequence_length = sequence_length
-            self.batch_size = tf.placeholder(tf.int32, shape=[])
+            self.batch_size = tf.placeholder(tf.int32, shape=[], name='batch_size')
 
         ############################################################################################
         #                                       Convolutions                                       #
@@ -111,11 +111,7 @@ class VOModel(object):
                                       strides,
                                       n_channels,
                                       reuse=tf.AUTO_REUSE)
-            if self.use_dropout:
-                self.cnn_activations.append(tf.nn.dropout(cnn_activation,
-                                                          keep_prob=keep_probs[idx]))
-            else:
-                self.cnn_activations.append(cnn_activation)
+            self.cnn_activations.append(cnn_activation)
 
         # compute number of activations for flattening the conv output
         def num_activations(conv):
