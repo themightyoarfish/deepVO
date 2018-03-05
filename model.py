@@ -1,3 +1,11 @@
+'''
+.. module:: model
+    Contains :py:class:`VOModel`, an implementation of DeepVO: Towards End-to-End Visual Odometry with Deep Recurrent
+    Convolutional Neural Networks by Wang et al.
+
+.. moduleauthor:: Rasmus Diederichsen
+
+'''
 import tensorflow as tf
 from math import ceil
 from tensorflow.contrib.rnn import *
@@ -23,12 +31,12 @@ class VOModel(object):
                     states are contained in this tensor. THE CELL STATE (TUPLE MEMBER H) MUST COME
                     BEFORE THE HIDDEN STATE (TUPLE MEMBER C).
     sequence_length :   int
-                        Length of the input sequences (cannot be altered)
+                        Length of the input sequences
 
     cnn_activations :   list(tf.Tensor)
                         List of cnn activations for all time steps
     zero_state  :   tuple(LSTMStateTuple)
-                    Tuple of LSTMStateTuples for each lstm layer. Filled with zeros.
+                    Tuple of :py:class:`LSTMStateTuple` s for each lstm layer. Filled with zeros.
     rnn_outputs :   tf.Tensor
                     outputs of the RNN
     rnn_state   :   tuple(LSTMStateTuple)
@@ -59,7 +67,7 @@ class VOModel(object):
         is_training :   bool
                         Do not use dropout for LSTM cells
         use_flownet :   bool
-                        Name CNN vars according to flownet naming scheme. You should call
+                        Name CNN vars according to flownet naming scheme. You _must_ call
                         :py:meth:`load_flownet`  before pushing stuff through the graph.
         '''
         if not optimizer_spec:
@@ -338,8 +346,8 @@ class VOModel(object):
         Returns
         -------
         tuple(np.ndarray)
-        Outputs of the ``train_step``, ``loss``, and ``rnn_state`` operations, and optionally
-        the predictions for r and t at the front
+            Outputs of the ``train_step``, ``loss``, and ``rnn_state`` operations, and optionally
+            the predictions for r and t at the front
         '''
         batch_size = input_batch.shape[0]
 
