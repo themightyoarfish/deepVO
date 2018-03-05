@@ -276,7 +276,7 @@ class DataManager(object):
                         Sequenth length of requested data
     debug           :   bool
                         Debug mode for additional information prints
-    dtype           :   dtype
+    dtype           :   np.dtype
                         Numpy datatype of stored data
     N               :   int
                         Number of batches
@@ -360,16 +360,18 @@ class DataManager(object):
             print(f'Image shape: {self.getImageShape()}')
 
     def getImageShape(self):
-        ''' image shape of one image
+        '''Image shape of one image
+
         Returns
         -------
-        Tupel(int)
+        tuple(int)
             Shape of image data
         '''
         return (self.H, self.W, self.C)
 
     def numTestBatches(self):
-        ''' Number of test batches
+        '''Number of test batches
+
         Returns
         -------
         int
@@ -378,7 +380,8 @@ class DataManager(object):
         return self.NTest
 
     def numTrainBatches(self):
-        ''' Number of training batches
+        '''Number of training batches
+
         Returns
         -------
         int
@@ -387,7 +390,8 @@ class DataManager(object):
         return self.NTrain
 
     def __len__(self):
-        ''' Number of total batches
+        '''Number of total batches
+
         Returns
         -------
         int
@@ -396,12 +400,13 @@ class DataManager(object):
         return self.N
 
     def batches(self):
-        ''' Training batches
+        '''Get non-overlapping training batches
+
         Yields
         -------
-        np.array
+        np.ndarray
             Images with shape depending on training batch size and sequence size
-        np.array
+        np.ndarray
             Labels with shape depending on training batch size and sequence size
         '''
         # 1D length of batch_size times sequence length
@@ -431,12 +436,13 @@ class DataManager(object):
             yield self.batch_images, self.batch_poses
 
     def test_batches(self):
-        ''' Test batches
+        '''Test batches
+
         Yields
         -------
-        np.array
+        np.ndarray
             Images with shape depending on test batch size and sequence size
-        np.array
+        np.ndarray
             Labels with shape depending on test batch size and sequence size
         '''
         # 1D length of batch_size times sequence length
@@ -466,32 +472,40 @@ class DataManager(object):
             yield self.batch_images, self.batch_poses
 
     def loadImage(self, id):
-        ''' Loads image with id < N
+        '''Loads image with id < N
+
         Parameters
         -------
         id    :   int
                   id of image < N
         Returns
         -------
-        np.array
+        np.ndarray
             Image
         '''
         img = np.squeeze(np.load(self.image_file_template % id))
         return img
 
     def saveImage(self, id, img):
-        ''' Saves image with id
+        '''Saves image with id
+
         Parameters
         -------
         id    :   int
                   id of image
-        img   :   np.array
+        img   :   np.ndarray
                   image to save
         '''
         np.save(self.image_file_template % id, img)
 
     def loadImages(self, ids):
-        ''' loads muliple images '''
+        '''loads muliple images
+
+        Parameters
+        ----------
+        ids :   list(int)
+                List of ids to fetch
+        '''
         num_images = len(ids)
         images     = np.empty([num_images, self.H, self.W, self.C], dtype=self.dtype)
         for idx in range(0, num_images):
@@ -504,15 +518,15 @@ class DataManager(object):
         return images
 
     def loadPose(self, id):
-        ''' loads pose '''
+        '''Ooads pose for id'''
         return np.load(self.pose_file_template % id)
 
     def savePose(self, id, pose):
-        ''' saves pose '''
+        '''Saves pose'''
         np.save(self.pose_file_template % id , pose)
 
     def loadPoses(self, ids):
-        ''' loads multiple poses '''
+        '''Loads multiple poses'''
         num_poses = len(ids)
         poses     = np.empty([num_poses, 6])
         for idx in range(0, num_poses):
@@ -527,8 +541,8 @@ class OptimizerSpec(dict):
     Attributes
     ----------
     step_counter    :   Variable
-                        Counter to be passed to optimizer#minimize() so it gets incremented during
-                        each update
+                        Counter to be passed to :py:meth:`Optimizer.minimize` so it gets incremented
+                        during each update
     learning_rate   :   tf.train.piecewise_constant
                         Learning rate of the optimizer (for later retrieval)
 
