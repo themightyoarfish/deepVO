@@ -1,4 +1,8 @@
 import numpy as np
+# import matplotlib.pyplot as plt
+# bc of this: https://github.com/matplotlib/matplotlib/issues/3466/#issuecomment-195899517
+import matplotlib
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 from numpy import linalg as LA
 
@@ -43,26 +47,32 @@ class PerformanceVisualizer(object):
     def add_translation_batch(self, prediction_batch, label_batch):
         self.trans_diffs.append(self.calculate_MSE_percentage(prediction_batch, label_batch))
 
-    def plot(self):
+    def plot(self, show=True):
         figure = plt.figure()
         ax = figure.add_subplot(211)
+        offset = 0
         for batch in self.trans_diffs:
-            ax.plot(batch, '-')
+            batch_size = batch.shape[0]
+            ax.plot(np.arange(offset, offset + batch_size), batch, '-')
             plt.title('Translational Error')
             plt.ylabel('translational error [displacement/seq_length]')
             plt.xlabel('number of sequence')
+            offset += batch_size
 
+        offset = 0
         ax = figure.add_subplot(212)
         for batch in self.rot_diffs:
-            ax.plot(batch, '-')
+            batch_size = batch.shape[0]
+            ax.plot(np.arange(offset, offset + batch_size), batch, '-')
             plt.title('Rotational Error')
             plt.ylabel('rotational error [???]')
             plt.xlabel('number of sequence')
+            offset += batch_size
         plt.show()
 
-    # TODO
-    def save_plot(self, path):
-        pass
+    def save_plot(self, path='.'):
+        filename = path + '/performance.pdf'
+        plt.savefig(filename)
 
 
 def main():

@@ -18,8 +18,7 @@ def main():
             in class_name and class_name != 'Optimizer'}
     parser = ArgumentParser('Train the DeepVO model')
     parser.add_argument('-d', '--dataset', type=str, required=True, help='Path to dataset folder')
-    parser.add_argument('-o', '--optimizer', required=True, type=str,
-            choices=tf_optimizers, help='Optimization algorithm')
+    parser.add_argument('-o', '--optimizer', required=True, type=str, choices=tf_optimizers, help='Optimization algorithm')
     parser.add_argument('-l', '--learning-rate', required=True, type=float,
             help='Learning rate for the optimizer')
     parser.add_argument('-b', '--batch-size', required=True, type=int,
@@ -85,7 +84,8 @@ def main():
                     _, loss, states = model.train(session, images, poses, initial_states=states)
                 print(f'\tloss={loss:04.5f}')
             if args.visualize_displacement:
-                visualizer.plot()
+                visualizer.plot(show=False)
+                visualizer.save_plot()
 
 if __name__ == '__main__':
     main()

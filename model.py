@@ -339,12 +339,14 @@ class VOModel(object):
         if return_prediction:
             return session.run([self.y_t, self.y_r, 
                                 self.train_step, self.loss, self.rnn_state],
-                               feed_dict={self.input_images: input_batch,
+                               feed_dict={self.batch_size: batch_size,
+                                          self.input_images: input_batch,
                                           self.target_poses: pose_batch,
                                           self.lstm_states: initial_states})
         else:
             return session.run([self.train_step, self.loss, self.rnn_state],
-                               feed_dict={self.input_images: input_batch,
+                               feed_dict={self.batch_size: batch_size,
+                                          self.input_images: input_batch,
                                           self.target_poses: pose_batch,
                                           self.lstm_states: initial_states})
 
