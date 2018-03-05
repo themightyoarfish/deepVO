@@ -59,7 +59,7 @@ def main():
                     args.memory_size,
                     args.sequence_length,
                     optimizer_spec=optimizer_spec,
-                    is_training=args.use_dropout,
+                    use_dropout=args.use_dropout,
                     use_flownet=args.flownet is not None)
 
     with tf.Session() as session:

@@ -50,7 +50,7 @@ class VOModel(object):
                  sequence_length,
                  optimizer_spec=None,
                  resize_images=False,
-                 is_training=True,
+                 use_dropout=True,
                  use_flownet=False):
         '''
         Parameters
@@ -64,7 +64,7 @@ class VOModel(object):
                             Specification of the optimizer
         resize_images   :   bool
                             Rezise images to a multiple of 64
-        is_training :   bool
+        use_dropout :   bool
                         Do not use dropout for LSTM cells
         use_flownet :   bool
                         Name CNN vars according to flownet naming scheme. You _must_ call
@@ -73,7 +73,7 @@ class VOModel(object):
         if not optimizer_spec:
             optimizer_spec = OptimizerSpec(kind='Adagrad', learning_rate=0.001)
         optimizer = optimizer_spec.create()
-        self.is_training = is_training
+        self.use_dropout = use_dropout
         self.use_flownet = use_flownet
         ############################################################################################
         #                                          Inputs                                          #
@@ -111,7 +111,7 @@ class VOModel(object):
                                       strides,
                                       n_channels,
                                       reuse=tf.AUTO_REUSE)
-            if self.is_training:
+            if self.use_dropout:
                 self.cnn_activations.append(tf.nn.dropout(cnn_activation,
                                                           keep_prob=keep_probs[idx]))
             else:
@@ -132,7 +132,7 @@ class VOModel(object):
             '''Create all recurrent layers as specified in the paper.'''
             lstm0 = LSTMCell(memory_size, state_is_tuple=True)
             lstm1 = LSTMCell(memory_size, state_is_tuple=True)
-            if self.is_training:
+            if self.use_dropout:
                 lstm_keep_probs = [0.7, 0.8]
                 lstm0 = tf.contrib.rnn.DropoutWrapper(lstm0, output_keep_prob=lstm_keep_probs[0])
                 lstm1 = tf.contrib.rnn.DropoutWrapper(lstm1, output_keep_prob=lstm_keep_probs[1])
