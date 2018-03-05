@@ -68,10 +68,6 @@ def main():
 
     saver = tf.train.Saver()
 
-
-
-    model_filename = 'deepVOmodel.ckpt'
-
     model_filename = path = os.path.join(os.getcwd(), 'deepVOmodel.ckpt')
 
     with tf.Session() as session:
@@ -82,10 +78,10 @@ def main():
             model.load_flownet(session, args.flownet)
 
         print("search for model : " + model_filename)
-        if( os.path.isfile(model_filename) ):
+        try:
             saver.restore(session, model_filename)
             print("Model restored.")
-        else:
+        except:
             print("No model found")
 
         for e in range(args.epochs):
