@@ -237,6 +237,17 @@ def convert_large_array(file_in, file_out, dtype, factor=1.0):
         np.multiply(dest, factor, out=dest)
 
 def subtract_poses(pose_x, pose_y):
+    '''Correct subtraction of two poses
+
+    Parameters
+    ----------
+    pose_x  :   np.array
+                input array of poses or one pose
+    pose_y  :   np.array
+                input array of poses or one pose
+    return  :   np.array
+                output array of pose_x - pose_y
+    '''
     pose_diff = np.subtract(pose_x, pose_y)
     pose_diff[..., 3:6] = np.arctan2(np.sin(pose_diff[..., 3:6]), np.cos(pose_diff[..., 3:6]))
     return pose_diff
@@ -248,6 +259,32 @@ from skimage.transform import resize
 
 
 class DataManager(object):
+    '''DataManager class for training and test data handling.
+
+    Attributes
+    ----------
+    dataset_path    :   str
+                        Path to directory containing the test images and poses
+    target_poses    :   tf.Placeholder
+                        Float placeholder of shape (batch_size, sequence_length, 6) with 3
+                        translational and 3 rotational components
+    batch_size      :   int
+                        Batch size of requested data
+    train_test_ratio:   float
+                        Train data size to test data size ratio
+    sequence_length :   int
+                        Sequenth length of requested data
+    debug           :   bool
+                        Debug mode for additional information prints
+    dtype           :   dtype
+                        Numpy datatype of stored data
+    N               :   int
+                        Number of batches
+    NTrain          :   int
+                        Number of training batches
+    NTest           :   int
+                        Number of test batches
+    '''
     def __init__(self,
                  dataset_path='data/dataset1/',
                  batch_size=10,
@@ -256,6 +293,27 @@ class DataManager(object):
                  debug=False,
                  dtype=np.float32,
                  resize_to_width=None):
+        '''
+        Parameters
+        ----------
+        dataset_path    :   str
+                            Path to directory containing the test images and poses
+        target_poses    :   tf.Placeholder
+                            Float placeholder of shape (batch_size, sequence_length, 6) with 3
+                            translational and 3 rotational components
+        batch_size      :   int
+                            Batch size of requested data
+        train_test_ratio:   float
+                            Train data size to test data size ratio
+        sequence_length :   int
+                            Sequenth length of requested data
+        debug           :   bool
+                            Debug mode for additional information prints
+        dtype           :   dtype
+                            Numpy datatype of stored data
+        resize_to_width :   int
+                            Resize the file data
+        '''
 
         if not os.path.exists(dataset_path):
             raise ValueError(f'Path {dataset_path} does not exist.')
@@ -302,18 +360,50 @@ class DataManager(object):
             print(f'Image shape: {self.getImageShape()}')
 
     def getImageShape(self):
+        ''' image shape of one image
+        Returns
+        -------
+        Tupel(int)
+            Shape of image data
+        '''
         return (self.H, self.W, self.C)
 
     def numTestBatches(self):
+        ''' Number of test batches
+        Returns
+        -------
+        int
+            Number of test batches
+        '''
         return self.NTest
 
     def numTrainBatches(self):
+        ''' Number of training batches
+        Returns
+        -------
+        int
+            Number of training batches
+        '''
         return self.NTrain
 
     def __len__(self):
+        ''' Number of total batches
+        Returns
+        -------
+        int
+            Number of total batches
+        '''
         return self.N
 
     def batches(self):
+        ''' Training batches
+        Yields
+        -------
+        np.array
+            Images with shape depending on training batch size and sequence size
+        np.array
+            Labels with shape depending on training batch size and sequence size
+        '''
         # 1D length of batch_size times sequence length
         chunk_size = self.batch_size * self.sequence_length
         for batch_start_idx in range(0, self.NTrain, chunk_size):
@@ -341,6 +431,14 @@ class DataManager(object):
             yield self.batch_images, self.batch_poses
 
     def test_batches(self):
+        ''' Test batches
+        Yields
+        -------
+        np.array
+            Images with shape depending on test batch size and sequence size
+        np.array
+            Labels with shape depending on test batch size and sequence size
+        '''
         # 1D length of batch_size times sequence length
         chunk_size = self.batch_size * self.sequence_length
         for batch_start_idx in range(self.NTrain-1, self.N, chunk_size):
@@ -368,13 +466,32 @@ class DataManager(object):
             yield self.batch_images, self.batch_poses
 
     def loadImage(self, id):
+        ''' Loads image with id < N
+        Parameters
+        -------
+        id    :   int
+                  id of image < N
+        Returns
+        -------
+        np.array
+            Image
+        '''
         img = np.squeeze(np.load(self.image_file_template % id))
         return img
 
     def saveImage(self, id, img):
+        ''' Saves image with id
+        Parameters
+        -------
+        id    :   int
+                  id of image
+        img   :   np.array
+                  image to save
+        '''
         np.save(self.image_file_template % id, img)
 
     def loadImages(self, ids):
+        ''' loads muliple images '''
         num_images = len(ids)
         images     = np.empty([num_images, self.H, self.W, self.C], dtype=self.dtype)
         for idx in range(0, num_images):
@@ -387,12 +504,15 @@ class DataManager(object):
         return images
 
     def loadPose(self, id):
+        ''' loads pose '''
         return np.load(self.pose_file_template % id)
 
     def savePose(self, id, pose):
+        ''' saves pose '''
         np.save(self.pose_file_template % id , pose)
 
     def loadPoses(self, ids):
+        ''' loads multiple poses '''
         num_poses = len(ids)
         poses     = np.empty([num_poses, 6])
         for idx in range(0, num_poses):
