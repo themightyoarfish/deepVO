@@ -194,12 +194,18 @@ class VOModel(object):
                     second element is the three euler angles
         rot_weight  :   float
                         Weight to scale the rotational error with. See paper equation (5)
+
+        Returns
+        -------
+        tf.Tensor
+            Scalar float tensor
         '''
         error_t = tf.losses.mean_squared_error(targets[0], predictions[0], reduction=tf.losses.Reduction.MEAN)
-        # TODO: Think about the case where the target is at -pi and the prediction at +pi. Does this
-        # happen?
-        error_r = tf.losses.mean_squared_error(targets[1], predictions[1], weights=rot_weight,
-                                               reduction=tf.losses.Reduction.MEAN)
+        # from
+        # https://stackoverflow.com/questions/46355068/keras-loss-function-for-360-degree-prediction
+        diff_r = targets[1] - predictions[1]
+        angle_differences = tf.atan2(tf.sin(diff_r), tf.cos(diff_r))
+        error_r = tf.reduce_sum(tf.square(angle_differences)) * rot_weight / tf.cast(self.batch_size, tf.float32)
         return error_r + error_t
 
     def cnn(self, input, ksizes, strides, n_channels, use_dropout=False, reuse=True):

@@ -68,6 +68,8 @@ def main():
         session.run(tf.global_variables_initializer())
         if args.flownet:
             model.load_flownet(session, args.flownet)
+
+        print('Start training...')
         for e in range(args.epochs):
             print(f'Epoch {e}')
             states = None
@@ -75,16 +77,17 @@ def main():
                 _, loss, states = model.train(session, images, poses, initial_states=states)
                 print(f'\tloss={loss:04.5f}')
 
-        # loss = 0
-        # count = 0
-        # states = None
-        # for images, poses in dm_train.batches():
-        #     y_t, y_r, _loss, states = model.test(session, images, poses, initial_states=states)
-        #     loss += _loss
-        #     count += 1
+        print('Testing...')
+        loss = 0
+        count = 0
+        states = None
+        for images, poses in dm_train.batches():
+            y_t, y_r, _loss, states = model.test(session, images, poses, initial_states=states)
+            loss += _loss
+            count += 1
 
-        # loss /= count
-        # print('Average loss per batch: {loss}')
+        loss /= count
+        print('Average loss per batch: {loss}')
 
 
 
