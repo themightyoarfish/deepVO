@@ -299,7 +299,12 @@ class DataManager(object):
     def batches(self):
         # 1D length of batch_size times sequence length
         chunk_size = self.batch_size * self.sequence_length
-        for batch_start_idx in range(0, self.NTrain, chunk_size):
+
+        batch_starts = np.arange(0,self.NTrain,chunk_size)
+
+        batch_starts = np.random.shuffle(batch_starts)
+
+        for batch_start_idx in batch_starts:
             record_in_batch = 0
             for sequence_start_idx in range(batch_start_idx, batch_start_idx + chunk_size, self.sequence_length):
 
@@ -325,7 +330,12 @@ class DataManager(object):
     def test_batches(self):
         # 1D length of batch_size times sequence length
         chunk_size = self.batch_size * self.sequence_length
-        for batch_start_idx in range(self.NTrain-1, self.N, chunk_size):
+
+        batch_starts = np.arange(self.NTrain-1, self.N, chunk_size)
+
+        batch_starts = np.random.shuffle(batch_starts)
+
+        for batch_start_idx in batch_starts:
             record_in_batch = 0
             for sequence_start_idx in range(batch_start_idx, batch_start_idx + chunk_size, self.sequence_length):
 
