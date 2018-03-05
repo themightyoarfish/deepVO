@@ -401,10 +401,10 @@ class VOModel(object):
         if initial_states is None:
             initial_states = tensor_from_lstm_tuple(self.get_zero_state(session, batch_size))
 
-        y_t, y_r = self.predictions
-        y_t_val, y_r_val, loss, states = session.run([y_t, y_r, self.loss, self.rnn_state],
-                                                     feed_dict={self.batch_size: batch_size,
-                                                                self.target_poses: pose_batch,
-                                                                self.input_images: input_batch,
-                                                                self.lstm_states: initial_states})
-        return y_t_val, y_r_val, loss, states
+        fetches = [*self.predictions, self.loss, self.rnn_state]
+        y_t, y_r, loss, states = session.run(fetches,
+                                             feed_dict={self.batch_size: batch_size,
+                                                        self.target_poses: pose_batch,
+                                                        self.input_images: input_batch,
+                                                        self.lstm_states: initial_states})
+        return y_t, y_r, loss, states
