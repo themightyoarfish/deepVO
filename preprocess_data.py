@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 '''
 .. module:: preprocess_data
-    Contains functions for normalizing and converting the raw data.
+
+Contains functions for normalizing and converting the raw data.
 
 .. moduleauthor:: Rasmus Diederichsen
 '''

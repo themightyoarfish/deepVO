@@ -1,4 +1,4 @@
-final_project
+DeepVO
 =============
 
 .. toctree::

@@ -1,7 +1,8 @@
 '''
 .. module:: model
-    Contains :py:class:`VOModel`, an implementation of DeepVO: Towards End-to-End Visual Odometry with Deep Recurrent
-    Convolutional Neural Networks by Wang et al.
+
+Contains :py:class:`VOModel`, an implementation of DeepVO: Towards End-to-End Visual Odometry with Deep Recurrent
+Convolutional Neural Networks by Wang et al.
 
 .. moduleauthor:: Rasmus Diederichsen
 
@@ -67,7 +68,7 @@ class VOModel(object):
         use_dropout :   bool
                         Do not use dropout for LSTM cells
         use_flownet :   bool
-                        Name CNN vars according to flownet naming scheme. You _must_ call
+                        Name CNN vars according to flownet naming scheme. You *must* call
                         :py:meth:`load_flownet`  before pushing stuff through the graph.
         '''
         if not optimizer_spec:

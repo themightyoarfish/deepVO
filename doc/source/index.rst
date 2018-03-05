@@ -11,6 +11,7 @@ Welcome to DeepVO's documentation!
    :caption: Contents:
 
    modules
+   command_line_usage
 
 
 

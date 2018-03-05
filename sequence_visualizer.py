@@ -1,6 +1,7 @@
 '''
 .. module:: sequence_visualizer
-    Contains the :py:class:`SequenceVisualizer` to visualise training success.
+
+Contains the :py:class:`SequenceVisualizer` to visualise trajectory
 
 .. moduleauthor:: Christian Heiden
 '''

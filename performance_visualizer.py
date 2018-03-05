@@ -8,7 +8,7 @@ from numpy import linalg as LA
 
 class PerformanceVisualizer(object):
 
-    """This class visualizes the performance of the network by plotting the percentage of the offset"""
+    '''This class visualizes the performance of the network by plotting the percentage of the offset'''
 
     def __init__(self):
         super(PerformanceVisualizer, self).__init__()
@@ -98,5 +98,5 @@ def main():
     p.plot()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

@@ -2,9 +2,8 @@
 '''
 .. module:: main
 
-Module for starting the training, testing and plotting functions
-
 .. moduleauthor:: Rasmus Diederichsen
+
 '''
 
 import sys
@@ -21,8 +20,8 @@ from model import VOModel
 from utils import DataManager, OptimizerSpec
 from performance_visualizer import PerformanceVisualizer
 
-def main():
-
+def make_parser():
+    '''Function returning parser is necessary for sphinx-argparse'''
     tf_optimizers = {class_name[:-len('Optimizer')] for class_name in dir(tf.train) if 'Optimizer'
                      in class_name and class_name != 'Optimizer'}
     parser = ArgumentParser('Train the DeepVO model')
@@ -49,7 +48,11 @@ def main():
                         help='Resize images to long edge')
     parser.add_argument('-c', '--load-checkpoint', action='store_true', default=False,
                         help='Load checkpoint from checkpoints/deepvo.ckpt')
-    args = parser.parse_args()
+    return parser
+
+def main():
+
+    args = make_parser().parse_args()
 
     data_manager_args = {
         'dataset_path': args.dataset,

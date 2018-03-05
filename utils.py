@@ -1,8 +1,9 @@
 '''
 .. module:: utils
-    Miscellaneous functions for data processing and batching. This module defines - among other things -
-    :py:class:`OptimizerSpec` for specifying optimizers, and :py:class:`DataManager` to partition
-    the data into batches.
+
+Miscellaneous functions for data processing and batching. This module defines - among other things -
+:py:class:`OptimizerSpec` for specifying optimizers, and :py:class:`DataManager` to partition
+the data into batches.
 
 .. moduleauthor Rasmus Diederichsen, Alexander Mock
 '''
@@ -16,7 +17,7 @@ def tensor_from_lstm_tuple(tuples, validate_shape=False):
         We do not check all possible error cases. For instance, the different LSTMStateTuples could
         not only have differing shapes (which we check for to some extend see ``validate_shape``
         parameter), but also the state members ``c`` and ``h`` could differ in their data type (Tensor,
-        array), which we _do not_ check.
+        array), which we *do not* check.
 
 
     Parameters
