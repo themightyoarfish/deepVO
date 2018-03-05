@@ -78,7 +78,7 @@ class VOModel(object):
                 self.input_images = resize_to_multiple(self.images, 64)
 
             self.target_poses = tf.placeholder(tf.float32, shape=[None, sequence_length, 6],
-                                               name='poses')
+                                               name='target_poses')
             # this placeholder is used for feeding both the cell and hidden states of both lstm
             # cells. The cell state comes before the hidden state
             N_lstm = 2
@@ -114,6 +114,7 @@ class VOModel(object):
             else:
                 self.cnn_activations.append(cnn_activation)
 
+        # compute number of activations for flattening the conv output
         def num_activations(conv):
             return np.prod(conv.shape[1:].as_list())
 
@@ -172,9 +173,11 @@ class VOModel(object):
             # decompose into translational and rotational component
             self.y_t, self.y_r = tf.split(y, 2, axis=2)
             self.x_t, self.x_r = tf.split(self.target_poses, 2, axis=2)
+            self.predictions = (self.y_t, self.y_r)
 
         self.loss = self.loss_function((self.x_t, self.x_r), (self.y_t, self.y_r))
-        self.train_step = optimizer.minimize(self.loss)
+        with tf.variable_scope('optimizer'):
+            self.train_step = optimizer.minimize(self.loss)
 
     def loss_function(self, targets, predictions, rot_weight=100):
         '''Create MSE loss.
@@ -191,11 +194,19 @@ class VOModel(object):
                     second element is the three euler angles
         rot_weight  :   float
                         Weight to scale the rotational error with. See paper equation (5)
+
+        Returns
+        -------
+        tf.Tensor
+            Scalar float tensor
         '''
-        error_t = tf.losses.mean_squared_error(targets[0], predictions[0], reduction=tf.losses.Reduction.SUM)
-        error_r = tf.losses.mean_squared_error(targets[1], predictions[1], weights=rot_weight,
-                                               reduction=tf.losses.Reduction.SUM)
-        return (error_r + error_t) / tf.cast(self.batch_size, tf.float32)
+        error_t = tf.losses.mean_squared_error(targets[0], predictions[0], reduction=tf.losses.Reduction.MEAN)
+        # from
+        # https://stackoverflow.com/questions/46355068/keras-loss-function-for-360-degree-prediction
+        diff_r = targets[1] - predictions[1]
+        angle_differences = tf.atan2(tf.sin(diff_r), tf.cos(diff_r))
+        error_r = tf.reduce_sum(tf.square(angle_differences)) * rot_weight / tf.cast(self.batch_size, tf.float32)
+        return error_r + error_t
 
     def cnn(self, input, ksizes, strides, n_channels, use_dropout=False, reuse=True):
         '''Create all the conv layers as specified in the paper.'''
@@ -308,7 +319,9 @@ class VOModel(object):
         tuple(np.ndarray)
             Outputs of ``cnn_activation`` for each time step
         '''
-        return session.run(self.cnn_activations, feed_dict={self.input_images: input_batch,
+        batch_size = input_batch.shape[0]
+        return session.run(self.cnn_activations, feed_dict={self.batch_size: batch_size,
+                                                            self.input_images: input_batch,
                                                             self.target_poses: pose_batch})
 
     def train(self, session, input_batch, pose_batch, initial_states=None, return_prediction=False):
@@ -317,38 +330,38 @@ class VOModel(object):
         Parameters
         ----------
         session :   tf.Session
-                    Session to execute op in
+        Session to execute op in
         input_batch  :  np.ndarray
-                        Array of shape (batch_size, sequence_length, h, w, 6) where two consecutive
-                        rgb images are stacked together.
+        Array of shape (batch_size, sequence_length, h, w, 6) where two consecutive
+        rgb images are stacked together.
         pose_batch  :   np.ndarray
-                        Array of shape (batch_size, sequence_length, 6) with Poses
+        Array of shape (batch_size, sequence_length, 6) with Poses
         initial_states   :   np.ndarray
-                            Array of shape (2, 2, batch_size, memory_size)
+        Array of shape (2, 2, batch_size, memory_size)
 
         Returns
         -------
         tuple(np.ndarray)
-            Outputs of the ``train_step``, ``loss``, and ``rnn_state`` operations.
+        Outputs of the ``train_step``, ``loss``, and ``rnn_state`` operations, and optionally
+        the predictions for r and t at the front
         '''
         batch_size = input_batch.shape[0]
 
         if initial_states is None:
-            initial_states = tensor_from_lstm_tuple(self.get_zero_state(session, batch_size))
+            zero_state = self.get_zero_state(session, batch_size)
+            initial_states = tensor_from_lstm_tuple(zero_state)
 
         if return_prediction:
-            return session.run([self.y_t, self.y_r, 
-                                self.train_step, self.loss, self.rnn_state],
-                               feed_dict={self.batch_size: batch_size,
-                                          self.input_images: input_batch,
-                                          self.target_poses: pose_batch,
-                                          self.lstm_states: initial_states})
+            fetches = [self.y_t, self.y_r,
+                       self.train_step, self.loss, self.rnn_state]
         else:
-            return session.run([self.train_step, self.loss, self.rnn_state],
-                               feed_dict={self.batch_size: batch_size,
-                                          self.input_images: input_batch,
-                                          self.target_poses: pose_batch,
-                                          self.lstm_states: initial_states})
+            fetches = [self.train_step, self.loss, self.rnn_state]
+
+        return session.run(fetches,
+                           feed_dict={self.batch_size: batch_size,
+                                      self.input_images: input_batch,
+                                      self.target_poses: pose_batch,
+                                      self.lstm_states: initial_states})
 
     def load_flownet(self, session, filename):
         '''Load flownet weights into the conv net.
@@ -362,13 +375,11 @@ class VOModel(object):
                         ``"flownet-S.ckpt-0.data-00000-of-00001"``, ``"flownet-S.ckpt-0.meta"``, and
                         ``"flownet-S.ckpt-0.index"``)
         '''
-        global_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=flownet_prefix)
-        # hacky. Can we avoid having the optimizer pollute the scope with its ops?
-        cnn_vars = [var for var in global_vars if 'optimizer' not in var.name]
+        cnn_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=flownet_prefix)
         restorer = tf.train.Saver(cnn_vars)
         restorer.restore(session, filename)
 
-    def test(self, session, input_batch, pose_batch):
+    def test(self, session, input_batch, pose_batch, initial_states=None):
         '''Get network predictions for some input sequence and compute average error.
 
         Parameters
@@ -381,4 +392,15 @@ class VOModel(object):
         pose_batch  :   np.ndarray
                         Array of shape (batch_size, sequence_length, 6) with Poses
         '''
-        pass
+        batch_size = input_batch.shape[0]
+
+        if initial_states is None:
+            initial_states = tensor_from_lstm_tuple(self.get_zero_state(session, batch_size))
+
+        y_t, y_r = self.predictions
+        y_t_val, y_r_val, loss, states = session.run([y_t, y_r, self.loss, self.rnn_state],
+                                                     feed_dict={self.batch_size: batch_size,
+                                                                self.target_poses: pose_batch,
+                                                                self.input_images: input_batch,
+                                                                self.lstm_states: initial_states})
+        return y_t_val, y_r_val, loss, states

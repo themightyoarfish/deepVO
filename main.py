@@ -42,20 +42,20 @@ def main():
         print('Use dropout')
 
     if args.width == 0:
-        dm = DataManager(
+        dm_train = DataManager(
                     dataset_path=args.dataset,
                     batch_size=args.batch_size,
                     sequence_length=args.sequence_length,
                     debug=True)
     else:
-        dm = DataManager(
+        dm_train = DataManager(
                     dataset_path=args.dataset,
                     batch_size=args.batch_size,
                     sequence_length=args.sequence_length,
                     debug=True,
                     resize_to_width=args.width)
 
-    image_shape = dm.getImageShape()
+    image_shape = dm_train.getImageShape()
 
     # create model
     optimizer_spec = OptimizerSpec(kind=args.optimizer, learning_rate=args.learning_rate)
@@ -70,12 +70,14 @@ def main():
         session.run(tf.global_variables_initializer())
         if args.flownet:
             model.load_flownet(session, args.flownet)
+
+        print('Start training...')
         for e in range(args.epochs):
             print(f'Epoch {e}')
             states = None
             if args.visualize_displacement:
                 visualizer = PerformanceVisualizer()
-            for images, poses in dm.batches():
+            for images, poses in dm_train.batches():
                 if args.visualize_displacement:
                     y_t, y_r, _, loss, states = model.train(session, images, poses, initial_states=states, return_prediction=True)
                     visualizer.add_translation_batch(y_t, poses[:,:,:3])
@@ -86,6 +88,19 @@ def main():
             if args.visualize_displacement:
                 visualizer.plot(show=False)
                 visualizer.save_plot()
+
+        print('Testing...')
+        loss = 0
+        count = 0
+        states = None
+        for images, poses in dm_train.batches():
+            y_t, y_r, _loss, states = model.test(session, images, poses, initial_states=states)
+            loss += _loss
+            count += 1
+
+        loss /= count
+        print(f'Average loss per batch: {loss}')
+
 
 if __name__ == '__main__':
     main()
