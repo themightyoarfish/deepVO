@@ -300,7 +300,13 @@ class DataManager(object):
         return images
 
     def loadPose(self, id):
-        return np.load(self.pose_file_template % id)
+        pose = np.load(self.pose_file_template % id)
+        self.checkPose(pose)
+        return pose
+
+    def checkPose(self, pose):
+        if np.absolute(pose[...,3]) > np.pi or np.absolute(pose[...,4]) > np.pi or np.absolute(pose[...,5]) > np.pi:
+            print("Warning! angle of pose: " + str(pose) + " is invalid" )
 
     def savePose(self, id, pose):
         np.save(self.pose_file_template % id , pose)
