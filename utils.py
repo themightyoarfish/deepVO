@@ -1,3 +1,11 @@
+'''
+.. module:: utils
+    Miscellaneous functions for data processing and batching. This module defines - among other things -
+    :py:class:`OptimizerSpec` for specifying optimizers, and :py:class:`DataManager` to partition
+    the data into batches.
+
+.. moduleauthor Rasmus Diederichsen, Alexander Mock
+'''
 import numpy as np
 
 
@@ -127,14 +135,14 @@ def resize_to_multiple(images, multiples):
 
     Returns
     -------
-    tf.op
+    tf.Operation
         Tensorflow op for resizing images
     '''
     from tensorflow.image import resize_images
     _, h, w, _ = images.get_shape()
     # if only one multiple, assume it's the value to use for all dims
     if not isinstance(multiples, tuple):
-        multiples = multiples * 2
+        multiples = (multiples, multiples)
     new_h, new_w = [int(ceil(input_shape[0] / multiples[0])),
                     int(ceil(input_shape[1] / multiples[1]))]
     return resize_images(images, [new_h, new_w])
@@ -144,6 +152,9 @@ def image_pairs(image_sequence, sequence_length):
     '''Generate sequences of stacked pairs of images where two 3-channel images are merged to on
     6-channel image. If the image sequence length is not evenly divided by the sequence length,
     fewer than the total number of images will be yielded.
+
+    .. note:: Deprecated
+        This function is deprecated by :py:class:`DataManager`
 
 
     Parameters
@@ -183,8 +194,15 @@ def image_pairs(image_sequence, sequence_length):
 
 
 def compute_rgb_mean(image_sequence):
+    '''Compute the mean over each channel separately over a set of images.
+
+    Parameters
+    ----------
+    image_sequence  :   np.ndarray
+                        Array of shape (N, h, w, c) or (h, w, c)
+    '''
     if image_sequence.ndim == 4:
-        N, h, w, c = image_sequence.shape
+        _, h, w, c = image_sequence.shape
     if image_sequence.ndim == 3:
         h, w, c = image_sequence.shape
     # compute mean separately for each channel
@@ -229,6 +247,7 @@ import os
 from glob import glob
 from os.path import join
 from skimage.transform import resize
+
 
 class DataManager(object):
     def __init__(self,
@@ -301,7 +320,8 @@ class DataManager(object):
         chunk_size = self.batch_size * self.sequence_length
         for batch_start_idx in range(0, self.NTrain, chunk_size):
             record_in_batch = 0
-            for sequence_start_idx in range(batch_start_idx, batch_start_idx + chunk_size, self.sequence_length):
+            for sequence_start_idx in range(batch_start_idx, batch_start_idx + chunk_size,
+                                            self.sequence_length):
 
                 sequence_end_idx = sequence_start_idx + self.sequence_length + 1
                 if sequence_end_idx >= self.NTrain:
@@ -327,7 +347,8 @@ class DataManager(object):
         chunk_size = self.batch_size * self.sequence_length
         for batch_start_idx in range(self.NTrain-1, self.N, chunk_size):
             record_in_batch = 0
-            for sequence_start_idx in range(batch_start_idx, batch_start_idx + chunk_size, self.sequence_length):
+            for sequence_start_idx in range(batch_start_idx, batch_start_idx + chunk_size,
+                                            self.sequence_length):
 
                 sequence_end_idx = sequence_start_idx + self.sequence_length + 1
                 if sequence_end_idx >= self.N:
