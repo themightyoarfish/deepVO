@@ -64,16 +64,31 @@ def main():
                     is_training=args.use_dropout,
                     use_flownet=args.flownet is not None)
 
+    saver = tf.train.Saver()
+
+    model_filename = 'deepVOmodel.ckpt'
+
     with tf.Session() as session:
+
         session.run(tf.global_variables_initializer())
+
         if args.flownet:
             model.load_flownet(session, args.flownet)
+
+        if( os.path.isfile(model_name) ):
+            saver.restore(session, model_filename)
+            print("Model restored.")
+
         for e in range(args.epochs):
             print(f'Epoch {e}')
             states = None
             for images, poses in dm.batches():
                 _, loss, states = model.train(session, images, poses, initial_states=states)
                 print(f'\tloss={loss:04.5f}')
+            # Save the variables to disk.
+
+            save_path = saver.save(session, model_filename)
+            print("Model saved in file: %s" % save_path)
 
 
 if __name__ == '__main__':
