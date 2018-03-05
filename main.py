@@ -81,9 +81,12 @@ def main():
         if args.flownet:
             model.load_flownet(session, args.flownet)
 
+        print("search for model : " + model_filename)
         if( os.path.isfile(model_filename) ):
             saver.restore(session, model_filename)
             print("Model restored.")
+        else:
+            print("No model found")
 
         for e in range(args.epochs):
             print(f'Epoch {e}')
