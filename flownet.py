@@ -1,9 +1,9 @@
 '''
 .. module:: flownet
 
-    Contains utilities for incorporating FlowNetSimple weights. The weights can be downloaded from
-    `here <https://s3.us-east-2.amazonaws.com/flownetdata/weights.tar.gz>`_ . This file contains all
-    weights for all FlowNet versions and is thus unfortunately huge.
+Contains utilities for incorporating FlowNetSimple weights. The weights can be downloaded from
+`here <https://s3.us-east-2.amazonaws.com/flownetdata/weights.tar.gz>`_ . This file contains all
+weights for all FlowNet versions and is thus unfortunately huge.
 
 .. data:: flownet_prefix
     The variable scope in which the flownet weights live

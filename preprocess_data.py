@@ -1,4 +1,10 @@
 #!/usr/bin/env python
+'''
+.. module:: preprocess_data
+    Contains functions for normalizing and converting the raw data.
+
+.. moduleauthor:: Rasmus Diederichsen
+'''
 
 from argparse import ArgumentParser
 import numpy as np
@@ -89,18 +95,22 @@ def mean_normalize(data_manager):
         data_manager.saveImage(idx, (img - mean_accumlator))
     print('\nDone')
 
+
 def add_pi_to_poses(data_manager):
+    '''Add Pi to every pose angle.'''
     N = len(data_manager)
     for idx in range(N):
         pose = data_manager.loadPose(idx)
-        pose[...,3:6] = pose[...,3:6] + np.pi
+        pose[..., 3:6] = pose[..., 3:6] + np.pi
         data_manager.savePose(idx, pose)
 
+
 def sub_pi_from_poses(data_manager):
+    '''Subtract Pi from every pose angle.'''
     N = len(data_manager)
     for idx in range(N):
         pose = data_manager.loadPose(idx)
-        pose[...,3:6] = pose[...,3:6] - np.pi
+        pose[..., 3:6] = pose[..., 3:6] - np.pi
         data_manager.savePose(idx, pose)
 
 

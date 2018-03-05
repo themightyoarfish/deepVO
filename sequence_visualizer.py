@@ -1,9 +1,15 @@
+'''
+.. module:: sequence_visualizer
+    Contains the :py:class:`SequenceVisualizer` to visualise training success.
+
+.. moduleauthor:: Christian Heiden
+'''
 import numpy as np
 import matplotlib.pyplot as plt
 
 class SequenceVisualizer(object):
 
-    """This class visualizes the output of the network"""
+    '''This class visualizes the output of the network'''
 
     def __init__(self):
         super(SequenceVisualizer, self).__init__()
@@ -71,5 +77,5 @@ def main():
     vis.plot_path()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

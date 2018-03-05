@@ -1,7 +1,8 @@
 #!/usr/bin/env python3.6
 '''
 .. module:: main
-    Module for starting the training, testing and plotting functions
+
+Module for starting the training, testing and plotting functions
 
 .. moduleauthor:: Rasmus Diederichsen
 '''
