@@ -234,6 +234,7 @@ class DataManager(object):
     def __init__(self,
                  dataset_path='data/dataset1/',
                  batch_size=10,
+                 train_test_ratio=0.7,
                  sequence_length=10,
                  debug=False,
                  dtype=np.float32,
@@ -250,6 +251,8 @@ class DataManager(object):
 
         image_files = glob(join(self.images_path, '*.npy'))
         self.N      = len(image_files)
+        self.NTrain = int(self.N * train_test_ratio)
+        self.NTest  = self.N - self.NTrain
 
         self.num_dec_file = sum(c.isdigit() for c in os.path.basename(image_files[0]))
 
@@ -284,13 +287,45 @@ class DataManager(object):
     def getImageShape(self):
         return (self.H, self.W, self.C)
 
+    def numTestBatches(self):
+        return self.NTest
+
+    def numTrainBatches(self):
+        return self.NTrain
+
     def __len__(self):
         return self.N
 
     def batches(self):
         # 1D length of batch_size times sequence length
         chunk_size = self.batch_size * self.sequence_length
-        for batch_start_idx in range(0, self.N, chunk_size):
+        for batch_start_idx in range(0, self.NTrain, chunk_size):
+            record_in_batch = 0
+            for sequence_start_idx in range(batch_start_idx, batch_start_idx + chunk_size, self.sequence_length):
+
+                sequence_end_idx = sequence_start_idx + self.sequence_length + 1
+                if sequence_end_idx >= self.NTrain:
+                    return
+                image_indices = np.arange(sequence_start_idx, sequence_end_idx)
+
+                # generate sequences
+                images = self.loadImages(image_indices)
+                poses  = self.loadPoses(image_indices)
+
+                self.batch_images[record_in_batch, ..., :3] = images[:-1]
+                self.batch_images[record_in_batch, ..., 3:] = images[1:]
+
+                # subtract first pose from all
+                # absolute pose to first pose
+                self.batch_poses[record_in_batch, ...] = subtract_poses(poses[1:], poses[0])
+                record_in_batch += 1
+
+            yield self.batch_images, self.batch_poses
+
+    def test_batches(self):
+        # 1D length of batch_size times sequence length
+        chunk_size = self.batch_size * self.sequence_length
+        for batch_start_idx in range(self.NTrain-1, self.N, chunk_size):
             record_in_batch = 0
             for sequence_start_idx in range(batch_start_idx, batch_start_idx + chunk_size, self.sequence_length):
 
