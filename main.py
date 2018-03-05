@@ -14,46 +14,41 @@ from utils import DataManager, OptimizerSpec
 
 def main():
     tf_optimizers = {class_name[:-len('Optimizer')] for class_name in dir(tf.train) if 'Optimizer'
-            in class_name and class_name != 'Optimizer'}
+                     in class_name and class_name != 'Optimizer'}
     parser = ArgumentParser('Train the DeepVO model')
     parser.add_argument('-d', '--dataset', type=str, required=True, help='Path to dataset folder')
     parser.add_argument('-o', '--optimizer', required=True, type=str,
-            choices=tf_optimizers, help='Optimization algorithm')
+                        choices=tf_optimizers, help='Optimization algorithm')
     parser.add_argument('-l', '--learning-rate', required=True, type=float,
-            help='Learning rate for the optimizer')
+                        help='Learning rate for the optimizer')
     parser.add_argument('-b', '--batch-size', required=True, type=int,
-            help='Batch size')
+                        help='Batch size')
     parser.add_argument('-e', '--epochs', required=True, type=int,
-            help='Number of epochs')
+                        help='Number of epochs')
     parser.add_argument('-f', '--flownet', required=False, type=str, default=None,
-            help='Path to pretrained flownet weights')
+                        help='Path to pretrained flownet weights')
     parser.add_argument('-m', '--memory-size', required=True, type=int,
-            help='Size of the lstm cell memory')
+                        help='Size of the lstm cell memory')
     parser.add_argument('-s', '--sequence-length', required=True, type=int,
-            help='Length of the sequences used for training the RNN.')
+                        help='Length of the sequences used for training the RNN.')
     parser.add_argument('-r', '--use-dropout', action='store_true', default=False,
-            help='Use dropout (during training)')
+                        help='Use dropout (during training)')
     parser.add_argument('-w', '--width', type=int, required=False, default=0,
-            help='Resize images to long edge')
+                        help='Resize images to long edge')
     args = parser.parse_args()
-    if args.use_dropout:
-        print('Use dropout')
 
-    if args.width == 0:
-        dm_train = DataManager(
-                    dataset_path=args.dataset,
-                    batch_size=args.batch_size,
-                    sequence_length=args.sequence_length,
-                    debug=True)
-    else:
-        dm_train = DataManager(
-                    dataset_path=args.dataset,
-                    batch_size=args.batch_size,
-                    sequence_length=args.sequence_length,
-                    debug=True,
-                    resize_to_width=args.width)
+    data_manager_args = {
+        'dataset_path': args.dataset,
+        'batch_size': args.batch_size,
+        'sequence_length': args.sequence_length,
+        'debug': True
+    }
+    if args.width != 0:
+        data_manager_args['resize_to_width'] = args.width
 
-    image_shape = dm_train.getImageShape()
+    data_manager = DataManager(**data_manager_args)
+
+    image_shape = data_manager.getImageShape()
 
     # create model
     optimizer_spec = OptimizerSpec(kind=args.optimizer, learning_rate=args.learning_rate)
@@ -73,22 +68,19 @@ def main():
         for e in range(args.epochs):
             print(f'Epoch {e}')
             states = None
-            for images, poses in dm_train.batches():
-                _, loss, states = model.train(session, images, poses, initial_states=states)
-                print(f'\tloss={loss:04.5f}')
+            for images, poses in data_manager.batches():
+                _, _, states = model.train(session, images, poses, initial_states=states)
 
-        print('Testing...')
-        loss = 0
-        count = 0
-        states = None
-        for images, poses in dm_train.batches():
-            y_t, y_r, _loss, states = model.test(session, images, poses, initial_states=states)
-            loss += _loss
-            count += 1
+            avg_loss = 0
+            count = 0
+            states = None
+            for images, poses in data_manager.test_batches():
+                y_t, y_r, _loss, states = model.test(session, images, poses, initial_states=states)
+                avg_loss += _loss
+                count += 1
 
-        loss /= count
-        print('Average loss per batch: {loss}')
-
+            avg_loss /= count
+            print(f'Average test loss across batches: {avg_loss:04.5f}')
 
 
 if __name__ == '__main__':

@@ -93,11 +93,6 @@ class VOModel(object):
         ksizes     = [7,  5,   5,   3,   3,   3,   3,   3,   3]
         strides    = [2,  2,   2,   1,   2,   1,   2,   1,   2]
         n_channels = [64, 128, 256, 256, 512, 512, 512, 512, 1024]
-        # TODO: Try different dropout schemes. On the small training set, every kind of dropout
-        # prevents convergence
-        n = len(ksizes)
-        keep_probs = np.linspace(0.5, 1, num=n)
-        lstm_keep_probs = [0.7, 0.8]
 
         self.cnn_activations = []
         # we call cnn() in a loop, but the variables will be reused after first creation
@@ -130,6 +125,7 @@ class VOModel(object):
             lstm0 = LSTMCell(memory_size, state_is_tuple=True)
             lstm1 = LSTMCell(memory_size, state_is_tuple=True)
             if self.is_training:
+                lstm_keep_probs = [0.7, 0.8]
                 lstm0 = tf.contrib.rnn.DropoutWrapper(lstm0, output_keep_prob=lstm_keep_probs[0])
                 lstm1 = tf.contrib.rnn.DropoutWrapper(lstm1, output_keep_prob=lstm_keep_probs[1])
             self.rnn = MultiRNNCell([lstm0, lstm1])
