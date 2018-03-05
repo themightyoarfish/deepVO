@@ -185,12 +185,10 @@ def convert_large_array(file_in, file_out, dtype, factor=1.0):
     if factor != 1.0:
         np.multiply(dest, factor, out=dest)
 
-
 def subtract_poses(pose_x, pose_y):
     pose_diff = np.subtract(pose_x, pose_y)
     pose_diff[..., 3:6] = np.arctan2(np.sin(pose_diff[..., 3:6]), np.cos(pose_diff[..., 3:6]))
     return pose_diff
-
 
 import os
 from glob import glob
@@ -300,13 +298,7 @@ class DataManager(object):
         return images
 
     def loadPose(self, id):
-        pose = np.load(self.pose_file_template % id)
-        self.checkPose(pose)
-        return pose
-
-    def checkPose(self, pose):
-        if np.absolute(pose[...,3]) > np.pi or np.absolute(pose[...,4]) > np.pi or np.absolute(pose[...,5]) > np.pi:
-            print("Warning! angle of pose: " + str(pose) + " is invalid" )
+        return np.load(self.pose_file_template % id)
 
     def savePose(self, id, pose):
         np.save(self.pose_file_template % id , pose)

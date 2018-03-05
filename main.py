@@ -12,8 +12,8 @@ import os.path
 from model import VOModel
 from utils import DataManager, OptimizerSpec
 
-
 def main():
+
     tf_optimizers = {class_name[:-len('Optimizer')] for class_name in dir(tf.train) if 'Optimizer'
             in class_name and class_name != 'Optimizer'}
     parser = ArgumentParser('Train the DeepVO model')
@@ -67,7 +67,7 @@ def main():
 
     saver = tf.train.Saver()
 
-    model_filename = 'deepVOmodel.ckpt'
+    model_filename = './deepVOmodel.ckpt'
 
     with tf.Session() as session:
 
