@@ -1,0 +1,88 @@
+\ProvidesPackage{explanation}
+
+% ~~~~~~~~ %
+% PACKAGES %
+% ~~~~~~~~ %
+
+% Subtle Rasmus rigid changes to columns.
+\usepackage{microtype}
+% For language dependent spelling processing.
+\usepackage[english]{babel}
+% Encoding
+\usepackage[utf8]{inputenc}
+% Links
+\usepackage[hidelinks]{hyperref}
+% for some nice pics
+\usepackage{graphicx}
+\graphicspath{ {../img/} {../} {img/}}
+% for code highlighting
+\usepackage{minted}
+\usemintedstyle{murphy}
+% For correctly set quotes depending on language set in babel.
+\usepackage{csquotes}
+% for algorithm env
+\usepackage{algpseudocode, algorithm}
+% for subfigures
+\usepackage{subcaption}
+% for math env (amsthm for proof)
+\usepackage{mathtools,amsthm}
+% for checkmarks!
+\usepackage{amssymb}
+% for the f***ing euro symbol
+\usepackage[official]{eurosym}
+% for the f***ing degree symbol
+\usepackage{siunitx}
+% for color (e.g. in equations)
+\usepackage[usenames,dvipsnames]{xcolor}
+% for the header
+\usepackage{fancyhdr}
+% for thicker hrules
+\usepackage{booktabs}
+% For inserting a spac after own commands.
+\usepackage{xspace}
+% For horizontal lists (enumerate*)
+\usepackage[inline]{enumitem}
+% For Biblatex
+
+\usepackage[
+    style=alphabetic,
+    maxbibnames=99,
+    backend=biber % !! needs biber to be installed
+]{biblatex}
+
+% Geometrystuff
+\usepackage{geometry}
+% for own geometry configurations
+% \geometry{a4paper,left=1.5cm, right=1.5cm, top=2.5cm, bottom=2.5cm}
+
+
+% ~~~~~~~~~~~~~ %
+% OWN FUNCTIONS %
+% ~~~~~~~~~~~~~ %
+
+% For nice ceiling functions.
+\DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+\DeclarePairedDelimiter{\floor}{\lfloor}{\rfloor}
+
+
+% Convenience functions regarding floating images.
+% <POS_SPEC> <WIDTH_PCTG> <NAME> <CAPTION> <LABEL>
+\newcommand{\picX}[5]{
+    \begin{figure}[#1]
+        \centering
+        \includegraphics[width=#2\textwidth]{#3}
+        \caption{#4}
+        #5
+    \end{figure}
+}
+
+% <NAME> <CAPTION> <LABEL>
+\newcommand{\pic}[3]{
+    \picX{H}{0.6}{#1}{#2}{#3}
+}
+
+% For nicely typeset et al.
+\newcommand{\etal}[0]{et\,al.\xspace}
+
+% For german quotes.
+\newcommand{\gq}[1]{\glqq#1\grqq}

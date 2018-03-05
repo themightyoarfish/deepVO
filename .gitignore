@@ -103,3 +103,17 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# latex related
+_minted*
+*.aux
+*.bbl
+*.out
+*.log
+*.fls
+*.aux
+*.blg
+*.synctex.gz
+*.fdb_latexmk
+*.bcf
+*.run.xml
