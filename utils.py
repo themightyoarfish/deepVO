@@ -1,14 +1,29 @@
+'''
+.. module:: utils
+    Miscellaneous functions for data processing and batching. This module defines - among other things -
+    :py:class:`OptimizerSpec` for specifying optimizers, and :py:class:`DataManager` to partition
+    the data into batches.
+
+.. moduleauthor Rasmus Diederichsen, Alexander Mock
+'''
 import numpy as np
 
 
-def tensor_from_lstm_tuple(tup, validate_shape=False):
+def tensor_from_lstm_tuple(tuples, validate_shape=False):
     '''Create a tensor from a tuple of :py:class:`tf.contrib.rnn.LSTMStateTuple` s.
+
+    .. note:: Error checks
+        We do not check all possible error cases. For instance, the different LSTMStateTuples could
+        not only have differing shapes (which we check for to some extend see ``validate_shape``
+        parameter), but also the state members ``c`` and ``h`` could differ in their data type (Tensor,
+        array), which we _do not_ check.
+
 
     Parameters
     ----------
-    tup :   tuple(LSTMStateTuple)
-            Tuple of N_lstm ``LSTMStateTuple`` s where each of the tuples has members of shape
-            ``(batch_size, memory_size)``
+    tuples  :   tuple(LSTMStateTuple)
+                Tuple of N_lstm ``LSTMStateTuple`` s where each of the tuples has members of shape
+                ``(batch_size, memory_size)``
     validate_shape  :   bool
                         Enforce identical shapes of all cell and memory states. This entails that
                         all dimensions must be known. When using variable batch size, set to
@@ -16,29 +31,53 @@ def tensor_from_lstm_tuple(tup, validate_shape=False):
 
     Returns
     -------
-    tf.Tensor
-        Tensor of shape ``(N_lstm, 2, batch_size, memory_size)`` with cell and hidden states per lstm cell
-        stacked together
+    tf.Tensor or np.ndarray
+        Tensor of shape ``(N_lstm, 2, batch_size, memory_size)`` with cell and hidden states per
+        lstm cell stacked together. An array is returned instead in case the LSTMStateTuple members
+        are already fully-defined arrays
     '''
+    import tensorflow as tf
     # one state tuple has two members of shape (batch_size, memory_size)
-    N_lstm      = len(tup)
-    batch_size  = tup[0].c.shape[0]
-    memory_size = tup[0].c.shape[1]
-    # return value
-    array       = [[None, None]] * N_lstm
+    N_lstm      = len(tuples)
+    batch_size  = tuples[0].c.shape[0]
+    memory_size = tuples[0].c.shape[1]
+    # return value. Since we don't know the dimensions upfront, make it a list instead of an array
+    list_array  = [[None, None]] * N_lstm
+    # explanation: see at return
+    states_are_tensors = False
 
     for lstm_idx in range(N_lstm):
-        lstm_state = tup[lstm_idx]
+        lstm_state = tuples[lstm_idx]
+
+        # check for incompatible shapes
         if validate_shape:
+            # all dims must match
             if not ((batch_size, memory_size) == lstm_state.c.shape == lstm_state.h.shape):
                 raise ValueError('All states must have the same dimenstion.')
         else:
+            # only the memory_size must match, batch_size is assumed to match, but cannot be
+            # verified
             if not (memory_size == lstm_state.c.shape[1] == lstm_state.h.shape[1]):
                 raise ValueError('All states must have the same memory size.')
-        array[lstm_idx][0] = lstm_state.h  # cell state
-        array[lstm_idx][1] = lstm_state.c  # hidden state
 
-    return array
+        if isinstance(lstm_state.c, tf.Tensor):
+            states_are_tensors = True
+
+        list_array[lstm_idx][0] = lstm_state.h  # cell state
+        list_array[lstm_idx][1] = lstm_state.c  # hidden state
+
+    ################################################################################################
+    #  Why this? convert_to_tensor works when the list elements are tensors, but not if they are   #
+    #  numpy arrays. This is probably a bug/missing feature. For this case, we must first convert  #
+    #  the fully defined list of arrays to an array.                                               #
+    #################################################################################################
+    ######################################################################
+    #  UPDATE: We now return an array if the states are already arrays.  #
+    ######################################################################
+    if not states_are_tensors:
+        return np.array(list_array)
+    else:
+        return tf.convert_to_tensor(list_array)
 
 
 # q = x,y,z,w
@@ -56,27 +95,28 @@ def toEulerAngles(q):
         Array of 3 elements [roll, pitch, yaw]
     '''
     sinr = 2.0 * (q[3] * q[0] + q[1] * q[2])
-    cosr = 1.0 - 2.0 * (q[0] * q[0] + q[1] * q[1] )
+    cosr = 1.0 - 2.0 * (q[0] * q[0] + q[1] * q[1])
     roll = np.arctan2(sinr, cosr)
-    sinp = 2.0 * (q[3] * q[1]  - q[2] * q[0] )
+    sinp = 2.0 * (q[3] * q[1] - q[2] * q[0])
 
-    if(np.abs(sinp) >= 1):
+    if np.abs(sinp) >= 1:
         pitch = np.copysign(np.pi / 2.0, sinp)
     else:
         pitch = np.arcsin(sinp)
 
-    siny = 2.0 * (q[3] * q[0] + q[0] * q[1] )
-    cosy = 1.0 - 2.0 * (q[1] * q[1] + q[2] * q[2] )
+    siny = 2.0 * (q[3] * q[0] + q[0] * q[1])
+    cosy = 1.0 - 2.0 * (q[1] * q[1] + q[2] * q[2])
     yaw = np.arctan2(siny, cosy)
     return np.array([roll, pitch, yaw])
+
 
 def posesFromQuaternionToRPY(poses):
     '''Batch-convert a set of poses from quaternions to euler angles.'''
     poses_xyzrpy = []
-    for i in range(0,len(poses)):
+    for idx in range(0, len(poses)):
         pose = np.zeros(6)
-        pose[0:3] = poses[i,0:3]
-        pose[3:6] = toEulerAngles(poses[i,3:7])
+        pose[0:3] = poses[idx, 0:3]
+        pose[3:6] = toEulerAngles(poses[idx, 3:7])
         poses_xyzrpy.append(pose)
 
     return np.array(poses_xyzrpy)
@@ -95,14 +135,14 @@ def resize_to_multiple(images, multiples):
 
     Returns
     -------
-    tf.op
+    tf.Operation
         Tensorflow op for resizing images
     '''
     from tensorflow.image import resize_images
     _, h, w, _ = images.get_shape()
     # if only one multiple, assume it's the value to use for all dims
     if not isinstance(multiples, tuple):
-        multiples = multiples * 2
+        multiples = (multiples, multiples)
     new_h, new_w = [int(ceil(input_shape[0] / multiples[0])),
                     int(ceil(input_shape[1] / multiples[1]))]
     return resize_images(images, [new_h, new_w])
@@ -112,6 +152,9 @@ def image_pairs(image_sequence, sequence_length):
     '''Generate sequences of stacked pairs of images where two 3-channel images are merged to on
     6-channel image. If the image sequence length is not evenly divided by the sequence length,
     fewer than the total number of images will be yielded.
+
+    .. note:: Deprecated
+        This function is deprecated by :py:class:`DataManager`
 
 
     Parameters
@@ -151,8 +194,15 @@ def image_pairs(image_sequence, sequence_length):
 
 
 def compute_rgb_mean(image_sequence):
+    '''Compute the mean over each channel separately over a set of images.
+
+    Parameters
+    ----------
+    image_sequence  :   np.ndarray
+                        Array of shape (N, h, w, c) or (h, w, c)
+    '''
     if image_sequence.ndim == 4:
-        N, h, w, c = image_sequence.shape
+        _, h, w, c = image_sequence.shape
     if image_sequence.ndim == 3:
         h, w, c = image_sequence.shape
     # compute mean separately for each channel
@@ -163,6 +213,7 @@ def compute_rgb_mean(image_sequence):
     mean_b = image_sequence[..., 2].mean()
     mean = np.array([mean_r, mean_g, mean_b])
     return mean
+
 
 def convert_large_array(file_in, file_out, dtype, factor=1.0):
     '''Convert data type of an array possibly too large to fit in memory.
@@ -195,10 +246,12 @@ from glob import glob
 from os.path import join
 from skimage.transform import resize
 
+
 class DataManager(object):
     def __init__(self,
                  dataset_path='data/dataset1/',
                  batch_size=10,
+                 train_test_ratio=0.7,
                  sequence_length=10,
                  debug=False,
                  dtype=np.float32,
@@ -215,6 +268,8 @@ class DataManager(object):
 
         image_files = glob(join(self.images_path, '*.npy'))
         self.N      = len(image_files)
+        self.NTrain = int(self.N * train_test_ratio)
+        self.NTest  = self.N - self.NTrain
 
         self.num_dec_file = sum(c.isdigit() for c in os.path.basename(image_files[0]))
 
@@ -249,15 +304,49 @@ class DataManager(object):
     def getImageShape(self):
         return (self.H, self.W, self.C)
 
+    def numTestBatches(self):
+        return self.NTest
+
+    def numTrainBatches(self):
+        return self.NTrain
+
     def __len__(self):
         return self.N
 
     def batches(self):
         # 1D length of batch_size times sequence length
         chunk_size = self.batch_size * self.sequence_length
-        for batch_start_idx in range(0, self.N, chunk_size):
+        for batch_start_idx in range(0, self.NTrain, chunk_size):
             record_in_batch = 0
-            for sequence_start_idx in range(batch_start_idx, batch_start_idx + chunk_size, self.sequence_length):
+            for sequence_start_idx in range(batch_start_idx, batch_start_idx + chunk_size,
+                                            self.sequence_length):
+
+                sequence_end_idx = sequence_start_idx + self.sequence_length + 1
+                if sequence_end_idx >= self.NTrain:
+                    return
+                image_indices = np.arange(sequence_start_idx, sequence_end_idx)
+
+                # generate sequences
+                images = self.loadImages(image_indices)
+                poses  = self.loadPoses(image_indices)
+
+                self.batch_images[record_in_batch, ..., :3] = images[:-1]
+                self.batch_images[record_in_batch, ..., 3:] = images[1:]
+
+                # subtract first pose from all
+                # absolute pose to first pose
+                self.batch_poses[record_in_batch, ...] = subtract_poses(poses[1:], poses[0])
+                record_in_batch += 1
+
+            yield self.batch_images, self.batch_poses
+
+    def test_batches(self):
+        # 1D length of batch_size times sequence length
+        chunk_size = self.batch_size * self.sequence_length
+        for batch_start_idx in range(self.NTrain-1, self.N, chunk_size):
+            record_in_batch = 0
+            for sequence_start_idx in range(batch_start_idx, batch_start_idx + chunk_size,
+                                            self.sequence_length):
 
                 sequence_end_idx = sequence_start_idx + self.sequence_length + 1
                 if sequence_end_idx >= self.N:
@@ -288,13 +377,13 @@ class DataManager(object):
     def loadImages(self, ids):
         num_images = len(ids)
         images     = np.empty([num_images, self.H, self.W, self.C], dtype=self.dtype)
-        for i in range(0, num_images):
+        for idx in range(0, num_images):
             # right colors:
-            img = self.loadImage(ids[i])
+            img = self.loadImage(ids[idx])
             if img.shape != (self.H, self.W, self.C):
-                images[i] = resize(img, output_shape=(self.H, self.W))
+                images[idx] = resize(img, output_shape=(self.H, self.W), preserve_range=True)
             else:
-                images[i] = img
+                images[idx] = img
         return images
 
     def loadPose(self, id):
@@ -306,8 +395,8 @@ class DataManager(object):
     def loadPoses(self, ids):
         num_poses = len(ids)
         poses     = np.empty([num_poses, 6])
-        for i in range(0, num_poses):
-            poses[i] = self.loadPose(ids[i])
+        for idx in range(0, num_poses):
+            poses[idx] = self.loadPose(ids[idx])
         return poses
 
 
