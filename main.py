@@ -10,6 +10,7 @@ from os.path import join
 
 from model import VOModel
 from utils import DataManager, OptimizerSpec
+from performance_visualizer import PerformanceVisualizer
 
 
 def main():
@@ -33,6 +34,8 @@ def main():
                         help='Length of the sequences used for training the RNN.')
     parser.add_argument('-r', '--use-dropout', action='store_true', default=False,
                         help='Use dropout (during training)')
+    parser.add_argument('-v', '--visualize-displacement', action='store_true', default=False,
+                        help='Plot the percentage of translational and rotational displacement')
     parser.add_argument('-w', '--width', type=int, required=False, default=0,
                         help='Resize images to long edge')
     args = parser.parse_args()
@@ -66,11 +69,14 @@ def main():
 
         print('Start training...')
         for e in range(args.epochs):
-            print(f'Epoch {e}')
+            print(f'Epoch {e+1} of {args.epochs}')
+            # reset state after each batch of consecutive sequences
             states = None
             for images, poses in data_manager.batches():
                 _, _, states = model.train(session, images, poses, initial_states=states)
 
+            # test on test set. We can't push it thorugh the net at once, so be use batches and
+            # compute average loss
             avg_loss = 0
             count = 0
             states = None

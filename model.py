@@ -167,11 +167,11 @@ class VOModel(object):
             # predictions
             y = tf.layers.dense(rnn_outputs, 6, kernel_initializer=kernel_initializer)
             # decompose into translational and rotational component
-            y_t, y_r = tf.split(y, 2, axis=2)
-            x_t, x_r = tf.split(self.target_poses, 2, axis=2)
-            self.predictions = (y_t, y_r)
+            self.y_t, self.y_r = tf.split(y, 2, axis=2)
+            self.x_t, self.x_r = tf.split(self.target_poses, 2, axis=2)
+            self.predictions = (self.y_t, self.y_r)
 
-        self.loss = self.loss_function((x_t, x_r), self.predictions)
+        self.loss = self.loss_function((self.x_t, self.x_r), (self.y_t, self.y_r))
         with tf.variable_scope('optimizer'):
             self.train_step = optimizer.minimize(self.loss)
 
@@ -320,25 +320,26 @@ class VOModel(object):
                                                             self.input_images: input_batch,
                                                             self.target_poses: pose_batch})
 
-    def train(self, session, input_batch, pose_batch, initial_states=None):
+    def train(self, session, input_batch, pose_batch, initial_states=None, return_prediction=False):
         '''Train the network.
 
         Parameters
         ----------
         session :   tf.Session
-                    Session to execute op in
+        Session to execute op in
         input_batch  :  np.ndarray
-                        Array of shape (batch_size, sequence_length, h, w, 6) where two consecutive
-                        rgb images are stacked together.
+        Array of shape (batch_size, sequence_length, h, w, 6) where two consecutive
+        rgb images are stacked together.
         pose_batch  :   np.ndarray
-                        Array of shape (batch_size, sequence_length, 6) with Poses
+        Array of shape (batch_size, sequence_length, 6) with Poses
         initial_states   :   np.ndarray
-                            Array of shape (2, 2, batch_size, memory_size)
+        Array of shape (2, 2, batch_size, memory_size)
 
         Returns
         -------
         tuple(np.ndarray)
-            Outputs of the ``train_step``, ``loss``, and ``rnn_state`` operations.
+        Outputs of the ``train_step``, ``loss``, and ``rnn_state`` operations, and optionally
+        the predictions for r and t at the front
         '''
         batch_size = input_batch.shape[0]
 
@@ -346,7 +347,13 @@ class VOModel(object):
             zero_state = self.get_zero_state(session, batch_size)
             initial_states = tensor_from_lstm_tuple(zero_state)
 
-        return session.run([self.train_step, self.loss, self.rnn_state],
+        if return_prediction:
+            fetches = [self.y_t, self.y_r,
+                       self.train_step, self.loss, self.rnn_state]
+        else:
+            fetches = [self.train_step, self.loss, self.rnn_state]
+
+        return session.run(fetches,
                            feed_dict={self.batch_size: batch_size,
                                       self.input_images: input_batch,
                                       self.target_poses: pose_batch,
@@ -365,7 +372,6 @@ class VOModel(object):
                         ``"flownet-S.ckpt-0.index"``)
         '''
         cnn_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=flownet_prefix)
-        # hacky. Can we avoid having the optimizer pollute the scope with its ops?
         restorer = tf.train.Saver(cnn_vars)
         restorer.restore(session, filename)
 
