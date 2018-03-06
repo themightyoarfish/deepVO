@@ -174,7 +174,6 @@ class DataManager(object):
         '''
         # 1D length of batch_size times sequence length
         for batch_start_idx in self.batch_positions_train:
-            print(batch_start_idx)
             record_in_batch = 0
             continue_var = False
             for sequence_start_idx in range(batch_start_idx, batch_start_idx +self.chunk_size,
@@ -213,7 +212,6 @@ class DataManager(object):
         '''
         # 1D length of batch_size times sequence length
         for batch_start_idx in self.batch_positions_test:
-            print(batch_start_idx)
             record_in_batch = 0
             continue_var = False
             for sequence_start_idx in range(batch_start_idx, batch_start_idx + self.chunk_size,
@@ -307,9 +305,6 @@ class DataManager(object):
         ''' call this after each epoch '''
         np.random.shuffle(self.batch_positions_train)
         np.random.shuffle(self.batch_positions_test)
-
-        print(self.batch_positions_train)
-        print(self.batch_positions_test)
 
     def _subtract_poses(self, pose_x, pose_y):
         '''Correct subtraction of two poses
