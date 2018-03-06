@@ -13,9 +13,9 @@ import numpy as np
 def tensor_from_lstm_tuple(tuples, validate_shape=False):
     '''Create a tensor from a tuple of :py:class:`tf.contrib.rnn.LSTMStateTuple` s.
 
-    .. note:: Error checks
+    .. note::
         We do not check all possible error cases. For instance, the different LSTMStateTuples could
-        not only have differing shapes (which we check for to some extend see ``validate_shape``
+        not only have differing shapes (which we check for to some extent see ``validate_shape``
         parameter), but also the state members ``c`` and ``h`` could differ in their data type (Tensor,
         array), which we *do not* check.
 
@@ -23,8 +23,8 @@ def tensor_from_lstm_tuple(tuples, validate_shape=False):
     Parameters
     ----------
     tuples  :   tuple(LSTMStateTuple)
-                Tuple of N_lstm ``LSTMStateTuple`` s where each of the tuples has members of shape
-                ``(batch_size, memory_size)``
+                Tuple of ``LSTMStateTuple`` s (as many as there are stacked lstm cells) where each
+                of the tuples has members of shape ``(batch_size, memory_size)``
     validate_shape  :   bool
                         Enforce identical shapes of all cell and memory states. This entails that
                         all dimensions must be known. When using variable batch size, set to
@@ -130,7 +130,7 @@ def resize_to_multiple(images, multiples):
     Parameters
     ----------
     images  :   tf.Tensor
-                Tensor of shape [batch, height, width, channels]
+                Tensor of shape ``(batch, height, width, channels)``
     multiples   :   int or tuple
                     The value/s that should evenly divide the resized image's dimensions
 
@@ -154,21 +154,21 @@ def image_pairs(image_sequence, sequence_length):
     6-channel image. If the image sequence length is not evenly divided by the sequence length,
     fewer than the total number of images will be yielded.
 
-    .. note:: Deprecated
+    .. note::
         This function is deprecated by :py:class:`DataManager`
 
 
     Parameters
     ----------
     image_sequence  :   np.ndarray
-                        Array of shape (num, h, w, 3)
+                        Array of shape ``(num, h, w, 3)``
     sequence_length  :  int
                         Number of elements (6-channel imgs) yielded each time
 
     Returns
     -------
     np.ndarray
-        Array of shape (sequence_length, h, w, 6)
+        Array of shape ``(sequence_length, h, w, 6)``
     '''
     N, h, w, c = image_sequence.shape
     for idx in range(0, N, sequence_length):
@@ -200,7 +200,7 @@ def compute_rgb_mean(image_sequence):
     Parameters
     ----------
     image_sequence  :   np.ndarray
-                        Array of shape (N, h, w, c) or (h, w, c)
+                        Array of shape ``(N, h, w, c)`` or ``(h, w, c)``
     '''
     if image_sequence.ndim == 4:
         _, h, w, c = image_sequence.shape
@@ -236,6 +236,7 @@ def convert_large_array(file_in, file_out, dtype, factor=1.0):
     np.copyto(dest, source, casting='unsafe')
     if factor != 1.0:
         np.multiply(dest, factor, out=dest)
+
 
 def subtract_poses(pose_x, pose_y):
     '''Correct subtraction of two poses
