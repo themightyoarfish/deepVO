@@ -89,8 +89,39 @@ In this Section the data acquisition for training and testing is presented (see 
 % --------------------------- %
 \subsection{Data Acquisition}
 \label{sec:evaluation:data}
-% TODO: What data are we working with
-% TODO: --> Show images of robot and the camera and maybe poses in rviz
+\begin{figure}[htb]
+    \centering
+    \begin{subfigure}[t]{0.6\linewidth}
+            \centering
+            \includegraphics[width=0.9\linewidth]{robot_small.jpg}
+            \caption[]{The ceres robot used for data acquisition.}
+            \label{fig:robot}
+    \end{subfigure}
+    \begin{subfigure}[t]{0.39\linewidth}
+            \centering
+            \includegraphics[width=0.75\linewidth]{image_pair.png}
+            \caption[]{Exemplary successive images taken from the robots camera.}
+            \label{fig:camera_images}
+    \end{subfigure}
+    \caption[]{Both figures depict the setup of our data acquisition.}
+    \label{fig:setup}
+\end{figure}
+
+% TODO: 
+% - Das ist der Roboter
+% - Eigene Daten aufnehmen
+%   - ROSbags mit Images und poses
+%       - ApproximateTimeSynchronizer
+% 
+% - preprocessing
+%   - float/mean images
+% 
+% - Data Handling
+%   - Sequences 
+%       - relative poses
+%       - stacked images
+%   - Shuffling
+%   - test & training data batches
 
 
 % ------------------- %
@@ -99,7 +130,7 @@ In this Section the data acquisition for training and testing is presented (see 
 \subsection{Results}
 \label{sec:evaluation:results}
 % TODO: Show the results
-
+Tba.
 
 % ---------------------- %
 % SUBSECTION: GREETINGS %
