@@ -165,6 +165,33 @@ component as
 This ensures the difference will have the proper sign and be in the interval
 $[-\pi,\pi]$.
 
+% -------------------- %
+% SUBSECTION: SOFTWARE %
+% -------------------- %
+\subsection{Overview of the software}
+\label{sec:deepvo:software}
+
+Our code is written for for Python 3.6 against the 1.4 version of TensorFlow. A
+conda environment specification is provided in \texttt{tfenv.txt} for
+convenience. The code is heavily documented with Sphinx and the numpydoc plugin,
+and documentation in various formats can be created by running \texttt{make} from the
+\texttt{doc/} directory.
+
+The purpose of the individual source files is as follows:
+\begin{itemize}
+    \item \texttt{main.py} -- Access to the training procedure
+    \item \texttt{data\_manager.py} -- Data loading from disk
+    \item \texttt{flownet.py} -- Global data for loading FlowNet weights
+    \item \texttt{model.py} -- Definition of the main RCNN class
+    \item \texttt{performance\_visualizer.py} -- Plotting functions for network performance
+    \item \texttt{preprocess\_data.py} -- Preprocessing routines for data type
+        conversion and mean-normalization
+    \item \texttt{utils.py} -- Miscellaneous utilities.
+\end{itemize}
+
+More details are provided in the compiled documentation (simply open
+\texttt{index.html}).
+
 % ------------------- %
 % SECTION: EVALUATION %
 % ------------------- %
