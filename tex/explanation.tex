@@ -25,9 +25,13 @@
 \label{sec:introduction}
 % TODO: Explain how visual odometry is useful
 % TODO: Explain the structure of this paper
-In robotics the localization of a robot within its environment is an essential task. Especially in the days of autonomously driving vehicles this field of research receives a significant amount of attention. There are many ways to perform robot localization and usually several methods are used at the same time in order to improve reliability of the whole system. The main task of a localization algorithm is to repeatedly estimate the current pose of the robot. A pose is a 6-\emph{d} vector containing the $x$, $y$, $z$ positional values, as well as the \emph{yaw}, \emph{pitch}, and \emph{roll} values representing the rotation of the robot.
+In robotics, the localization of a robot within its environment is an essential task. Especially in the days of autonomously driving vehicles this field of research receives a significant amount of attention. There are many ways to perform robot localization and usually several methods are used at the same time in order to improve reliability of the whole system. The main task of a localization algorithm is to repeatedly estimate the current pose of the robot. A pose is a 6-\emph{d} vector containing the $x$, $y$, $z$ positional values, as well as the \emph{yaw}, \emph{pitch}, and \emph{roll} values representing the rotation of the robot.
 
-One approach of relative localization is \emph{odometry}. In most applications odometry denotes the usage of wheel or motor movement data for estimating the change in position over time (similar method to the speed estimation in a car). As just mentioned this method only provides relative localization which in this case means that the starting point of the robot is used as a reference position. In other words all estimated poses are in a coordinate system which is initially defined by the starting pose. Figure~\ref{fig:reference_frame} depicts a graphical explanation of the localization algorithm where the arrows show the change of the position over time.
+One approach of relative localization is \emph{odometry}. In most applications
+odometry denotes the usage of wheel or motor movement data for estimating the
+change in position over time (similar method to the speed estimation in a car).
+Other sensors such as interial measurement units (IMUs) can also be fused with
+odometry data. This method only provides relative localization which in this case means that the starting point of the robot is used as a reference position. In other words all estimated poses are in a coordinate system which is initially defined by the starting pose. Figure~\ref{fig:reference_frame} depicts a graphical explanation of the localization algorithm where the arrows show the change of the position over time.
 
 \begin{figure}[tbh]
     \centering
@@ -36,11 +40,27 @@ One approach of relative localization is \emph{odometry}. In most applications o
     \label{fig:reference_frame}
 \end{figure}
 
-Another relative localization approach is \emph{visual} odometry which tries to fulfill the same goal as simple odometry but instead of motor or wheel movements, it uses camera images. Classic approaches use techniques like optical flow between successive images in order to determine a direction of movement between those two points in time. Usually these approaches try to find similar regions in both images and often make use of image features.
+Another relative localization approach is \emph{visual} odometry which tries to
+fulfill the same goal as simple odometry but instead of motor or wheel
+movements, it uses camera images. Classic approaches use techniques like optical
+flow or feature matching between successive images in order to determine a
+direction of movement between those two points in time.
 
-The method we are going to present in this work is a visual odometry-based approach but uses deep learning for determining the change of movement between successive images. The original paper by Wang~\etal~\cite{wang2017deepvo} was published in 2017 and describes the structure of a deep neural network, called \emph{DeepVO}, and presents its performance on the well-known KITTI dataset which contains camera images and pose estimations of a car (a detailed explanation is given in section~\ref{sec:deepvo:original}.
+The method we are going to present in this work is a visual odometry-based
+approach but uses deep learning for determining the change of movement between
+successive images. The original paper by Wang \etal{} \cite{wang2017deepvo} was
+published in 2017 and describes the structure of a deep neural network
+and evaluates its performance on the well-known KITTI dataset
+which contains camera images and pose estimations of a car (a detailed
+explanation is given in section~\ref{sec:deepvo:original}.
 
-This paper is structured as follows. Section~\ref{sec:deepvo:original} presents the idea and structure of the DeepVO Network and Section~\ref{sec:deepvo:approach} gives a short explanation of how we implemented it in TensorFlow. Section~\ref{sec:evaluation:data} will elaborate on how we gathered data for training and testing. In Section~\ref{sec:evaluation:results} we present the training behavior and performance results of the our DeepVO implementation.
+This paper is structured as follows. Section~\ref{sec:deepvo:original} presents
+the idea and structure of the DeepVO Network and
+Section~\ref{sec:deepvo:approach} gives a short explanation of how we
+implemented it in TensorFlow. Section~\ref{sec:evaluation:data} will elaborate
+on how we gathered data for training and testing. In
+Section~\ref{sec:evaluation:results} we present the training behavior and
+performance results of the our DeepVO implementation.
 
 
 % --------------- %
@@ -48,7 +68,7 @@ This paper is structured as follows. Section~\ref{sec:deepvo:original} presents 
 % --------------- %
 \section{DeepVO Model}
 \label{sec:deepvo}
-In this section the DeepVO network is presented (see Section~\ref{sec:deepvo:original}) together with our variant implemented in TensorFlow (see Section~\ref{sec:deepvo:approach}).
+In this section, the DeepVO network is presented (see Section~\ref{sec:deepvo:original}) together with our variant implemented in TensorFlow (see Section~\ref{sec:deepvo:approach}).
 
 
 % -------------------------- %
@@ -57,6 +77,12 @@ In this section the DeepVO network is presented (see Section~\ref{sec:deepvo:ori
 \subsection{Original Paper}
 \label{sec:deepvo:original}
 % TODO: Explain the deepVO model
+
+The architecture for end-to-end learning of robot pose estimation is a recurrent
+CNN where the convolutional portion is based on FlowNetSimple \citep{flownet} to
+estimate the optical flow between successive images. \autoref{fig:architecture}
+shows the network. Two successive images are stacked together and labeled with
+the second image's pose
 
 
 % -------------------- %
