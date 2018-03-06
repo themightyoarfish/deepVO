@@ -87,11 +87,50 @@ In this section, the DeepVO network is presented (see Section~\ref{sec:deepvo:or
 % TODO: Explain the deepVO model
 
 The architecture for end-to-end learning of robot pose estimation is a recurrent
-CNN where the convolutional portion is based on FlowNetSimple \citep{flownet} to
-estimate the optical flow between successive images. \autoref{fig:architecture}
+CNN where the convolutional portion is based on FlowNetSimple \cite{flownet} to
+estimate the optical flow between successive images. The convolutional layers
+are shown in \autoref{tab:cnn}
 shows the network. Two successive images are stacked together and labeled with
-the second image's pose
+the second image's pose. The stacked tensor is fed into the CNN to learn
+features and estimate the optical flow. Subsequent LSTM layers are used to learn
+consistent pose estimates from several timesteps in the past. The LSTM cells are
+equipped with 1000 memory units.
 
+\begin{table}
+    \centering
+    \caption{FlowNet CNN layers}
+    \label{tab:cnn}
+    \begin{tabular}{cccrc}
+        Layer & kernel size & strides & filters & activation\\\hline
+        1     & 7           & 2       & 64      & reLU\\
+        2     & 5           & 2       & 128     & reLU\\
+        3     & 5           & 2       & 256     & reLU\\
+        4     & 3           & 1       & 256     & reLU\\
+        5     & 3           & 2       & 512     & reLU\\
+        6     & 3           & 1       & 512     & reLU\\
+        7     & 3           & 2       & 512     & reLU\\
+        8     & 3           & 1       & 512     & reLU\\
+        9     & 3           & 2       & 1024    & -\\\hline
+    \end{tabular}
+\end{table}
+
+Not mentioned in the paper, a dense sigmoid layer with 6 output units is added
+to map the LSTM state onto three translation and rotation values.
+
+The training loss is given as the mean squared error between network output and
+target pose, summed over batch and time dimensions.
+\begin{align}
+    L(\text{Batch}; \theta) = \frac{1}{B} \sum^{B}_{i=1} \sum^{T}_{k=1}
+    \Vert\hat{p}_{i,k} - p_{i,k} \Vert^2 + \kappa \Vert \hat{\phi}_{i,k} - \phi_{i,k} \Vert^2
+\end{align}
+
+where $\kappa$ is introduced as a weighting factor since translational and
+rotational units are not directly comparable. \cite{wang2017deepvo} use the
+Adagrad optimizer with a learning rate of 0.001. Futher parameters such as the
+batch size, sequence length, dropout details, and dropout details are
+missing from the paper.
+
+A pretrained FlowNet model is used to speed up convergence.
 
 % -------------------- %
 % SUBSECTION: APPROACH %
@@ -101,6 +140,30 @@ the second image's pose
 % TODO: Explain how we implemented the model described in the paper
 % TODO: --> This includes other implementations we found on the web? or problems we had, or simply stuff we did'nt know better
 
+Our implementation attempts to follow \cite{wang2017deepvo} and thus implements
+all details from the paper, including loading FlowNet weights.
+However, we were not able guess some hyperparameters
+used for training. Hyperparameter optimization was also hampered by the fact
+that it appears to be impossible to train this architecture with reasonable
+layer sizes even on a powerful Tesla Volta GPU with 16GB of VRAM. Already on
+small batch sizes ($\sim 10$) and sequence lengths ($\sim 10$), the network cannot be
+trained even with a reduction of the LSTM state sizes. This observation calls
+into question the claim that \cite{wang2017deepvo} trained the network on a
+single K80 GPU.
+
+While the paper makes no mention of treating angle differences in any particular
+way in the loss function, we ensured the angular difference between estimate and
+target rotation is always in the range $[-\pi,\pi]$. Without special
+consideration, the difference between e.g. $1^\circ$ and $359^\circ$ would come out as
+$358^\circ$ instead of $-2^\circ$. We thus compute the difference in the rotational
+component as
+\begin{align}
+    \text{diff}(\hat{\phi}_i,\phi_i) = \atantwo\left(\sin\hat{\phi}_i - \phi_i,
+    \cos{\hat{\phi}_i -\phi_i}\right)
+\end{align}
+
+This ensures the difference will have the proper sign and be in the interval
+$[-\pi,\pi]$.
 
 % ------------------- %
 % SECTION: EVALUATION %
