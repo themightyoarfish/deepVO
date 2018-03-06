@@ -135,8 +135,8 @@ def main():
             data_manager.shuffleBatches()
 
         f, ax = plt.subplots(1)
-        ax.plot(losses)
-        ax.set_title('Losses with 7/3 train-test split)')
+        ax.plot(np.arange(args.epochs), losses)
+        ax.set_title('Losses with 7/3 train-test split')
         ax.set_xlabel('epoch')
         ax.set_ylabel('Test loss')
         f.savefig('losses.pdf')
