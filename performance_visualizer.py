@@ -2,7 +2,6 @@ import numpy as np
 # import matplotlib.pyplot as plt
 # bc of this: https://github.com/matplotlib/matplotlib/issues/3466/#issuecomment-195899517
 import matplotlib
-matplotlib.use('agg')
 import matplotlib.pyplot as plt
 from numpy import linalg as LA
 
