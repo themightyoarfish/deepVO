@@ -140,7 +140,7 @@ class DataManager(object):
         int
             Number of test batches
         '''
-        return self.NTest
+        return self.num_batches_test
 
     def numTrainBatches(self):
         '''Number of training batches
@@ -150,15 +150,15 @@ class DataManager(object):
         int
             Number of training batches
         '''
-        return self.NTrain
+        return self.num_batches_train
 
     def __len__(self):
-        '''Number of total batches
+        '''Number of total images/poses
 
         Returns
         -------
         int
-            Number of total batches
+            Number of total images/poses
         '''
         return self.N
 
@@ -362,26 +362,17 @@ def main():
         print(labels.shape)
 
         if args.video:
-            batch_elem = 0
-            test_image_src = images[batch_elem, 0, ..., :3]
-            plt.imshow(test_image_src)
-            plt.title("START IMAGE")
-            plt.show()
 
-            # second image in sequence
-            image_target = images[batch_elem, 0, ..., 3:]
-            label_target = labels[batch_elem, 0, ...]
+            f, axarr = plt.subplots(2,2)
+            axarr[0,0].imshow( images[0, 0, ..., :3])
+            axarr[0,0].set_title("First stack in sequence")
+            axarr[0,1].imshow( images[0, 0, ..., 3:])
+            axarr[0,1].set_title( str(labels[0, 0, ...]) )
+            axarr[1,0].imshow( images[0, -1, ..., :3])
+            axarr[1,0].set_title( "Last stack in sequence" )
+            axarr[1,1].imshow( images[0, -1, ..., 3:])
+            axarr[1,1].set_title( str(labels[0, -1, ...]) )
 
-            plt.imshow(image_target)
-            plt.title(str(label_target))
-            plt.show()
-
-            # last image in sequence
-            image_target = images[batch_elem, 9, ..., 3:]
-            label_target = labels[batch_elem, 9, ...]
-
-            plt.imshow(image_target)
-            plt.title(str(label_target))
             plt.show()
 
     print("Number of images in test batches: " + str(data_manager.numTestBatches() ) )
