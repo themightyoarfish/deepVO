@@ -323,9 +323,8 @@ class DataManager(object):
         return pose_diff
 
 import sys
-import numpy as np
 from argparse import ArgumentParser
-from matplotlib import pyplot as plt
+
 
 def make_parser():
     '''Function returning parser is necessary for sphinx-argparse'''
@@ -337,6 +336,8 @@ def make_parser():
     return parser
 
 def main():
+    import numpy as np
+    from matplotlib import pyplot as plt
     args = make_parser().parse_args()
 
     batch_size = 10
