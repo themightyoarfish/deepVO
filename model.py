@@ -1,3 +1,12 @@
+'''
+.. module:: model
+
+Contains :py:class:`VOModel`, an implementation of DeepVO: Towards End-to-End Visual Odometry with Deep Recurrent
+Convolutional Neural Networks by Wang et al.
+
+.. moduleauthor:: Rasmus Diederichsen
+
+'''
 import tensorflow as tf
 from math import ceil
 from tensorflow.contrib.rnn import *
@@ -23,12 +32,12 @@ class VOModel(object):
                     states are contained in this tensor. THE CELL STATE (TUPLE MEMBER H) MUST COME
                     BEFORE THE HIDDEN STATE (TUPLE MEMBER C).
     sequence_length :   int
-                        Length of the input sequences (cannot be altered)
+                        Length of the input sequences
 
     cnn_activations :   list(tf.Tensor)
                         List of cnn activations for all time steps
     zero_state  :   tuple(LSTMStateTuple)
-                    Tuple of LSTMStateTuples for each lstm layer. Filled with zeros.
+                    Tuple of :py:class:`LSTMStateTuple` s for each lstm layer. Filled with zeros.
     rnn_outputs :   tf.Tensor
                     outputs of the RNN
     rnn_state   :   tuple(LSTMStateTuple)
@@ -42,7 +51,7 @@ class VOModel(object):
                  sequence_length,
                  optimizer_spec=None,
                  resize_images=False,
-                 is_training=True,
+                 use_dropout=True,
                  use_flownet=False):
         '''
         Parameters
@@ -56,17 +65,18 @@ class VOModel(object):
                             Specification of the optimizer
         resize_images   :   bool
                             Rezise images to a multiple of 64
-        is_training :   bool
+        use_dropout :   bool
                         Do not use dropout for LSTM cells
         use_flownet :   bool
-                        Name CNN vars according to flownet naming scheme. You should call
+                        Name CNN vars according to flownet naming scheme. You *must* call
                         :py:meth:`load_flownet`  before pushing stuff through the graph.
         '''
         if not optimizer_spec:
             optimizer_spec = OptimizerSpec(kind='Adagrad', learning_rate=0.001)
         optimizer = optimizer_spec.create()
-        self.is_training = is_training
+        self.use_dropout = use_dropout
         self.use_flownet = use_flownet
+        self.sequence_length = sequence_length
         ############################################################################################
         #                                          Inputs                                          #
         ############################################################################################
@@ -78,14 +88,13 @@ class VOModel(object):
                 self.input_images = resize_to_multiple(self.images, 64)
 
             self.target_poses = tf.placeholder(tf.float32, shape=[None, sequence_length, 6],
-                                               name='poses')
+                                               name='target_poses')
             # this placeholder is used for feeding both the cell and hidden states of both lstm
             # cells. The cell state comes before the hidden state
             N_lstm = 2
             self.lstm_states = tf.placeholder(tf.float32, shape=(N_lstm, 2, None, memory_size),
                                               name='LSTM_states')
-            self.sequence_length = sequence_length
-            self.batch_size = tf.placeholder(tf.int32, shape=[])
+            self.batch_size = tf.placeholder(tf.int32, shape=[], name='batch_size')
 
         ############################################################################################
         #                                       Convolutions                                       #
@@ -93,11 +102,6 @@ class VOModel(object):
         ksizes     = [7,  5,   5,   3,   3,   3,   3,   3,   3]
         strides    = [2,  2,   2,   1,   2,   1,   2,   1,   2]
         n_channels = [64, 128, 256, 256, 512, 512, 512, 512, 1024]
-        # TODO: Try different dropout schemes. On the small training set, every kind of dropout
-        # prevents convergence
-        n = len(ksizes)
-        keep_probs = np.linspace(0.5, 1, num=n)
-        lstm_keep_probs = [0.7, 0.8]
 
         self.cnn_activations = []
         # we call cnn() in a loop, but the variables will be reused after first creation
@@ -108,12 +112,9 @@ class VOModel(object):
                                       strides,
                                       n_channels,
                                       reuse=tf.AUTO_REUSE)
-            if self.is_training:
-                self.cnn_activations.append(tf.nn.dropout(cnn_activation,
-                                                          keep_prob=keep_probs[idx]))
-            else:
-                self.cnn_activations.append(cnn_activation)
+            self.cnn_activations.append(cnn_activation)
 
+        # compute number of activations for flattening the conv output
         def num_activations(conv):
             return np.prod(conv.shape[1:].as_list())
 
@@ -128,7 +129,8 @@ class VOModel(object):
             '''Create all recurrent layers as specified in the paper.'''
             lstm0 = LSTMCell(memory_size, state_is_tuple=True)
             lstm1 = LSTMCell(memory_size, state_is_tuple=True)
-            if self.is_training:
+            if self.use_dropout:
+                lstm_keep_probs = [0.7, 0.8]
                 lstm0 = tf.contrib.rnn.DropoutWrapper(lstm0, output_keep_prob=lstm_keep_probs[0])
                 lstm1 = tf.contrib.rnn.DropoutWrapper(lstm1, output_keep_prob=lstm_keep_probs[1])
             self.rnn = MultiRNNCell([lstm0, lstm1])
@@ -170,11 +172,13 @@ class VOModel(object):
             # predictions
             y = tf.layers.dense(rnn_outputs, 6, kernel_initializer=kernel_initializer)
             # decompose into translational and rotational component
-            y_t, y_r = tf.split(y, 2, axis=2)
-            x_t, x_r = tf.split(self.target_poses, 2, axis=2)
+            self.y_t, self.y_r = tf.split(y, 2, axis=2)
+            self.x_t, self.x_r = tf.split(self.target_poses, 2, axis=2)
+            self.predictions = (self.y_t, self.y_r)
 
-        self.loss       = self.loss_function((x_t, x_r), (y_t, y_r))
-        self.train_step = optimizer.minimize(self.loss)
+        self.loss = self.loss_function((self.x_t, self.x_r), (self.y_t, self.y_r))
+        with tf.variable_scope('optimizer'):
+            self.train_step = optimizer.minimize(self.loss)
 
     def loss_function(self, targets, predictions, rot_weight=100):
         '''Create MSE loss.
@@ -191,11 +195,19 @@ class VOModel(object):
                     second element is the three euler angles
         rot_weight  :   float
                         Weight to scale the rotational error with. See paper equation (5)
+
+        Returns
+        -------
+        tf.Tensor
+            Scalar float tensor
         '''
-        error_t = tf.losses.mean_squared_error(targets[0], predictions[0], reduction=tf.losses.Reduction.SUM)
-        error_r = tf.losses.mean_squared_error(targets[1], predictions[1], weights=rot_weight,
-                                               reduction=tf.losses.Reduction.SUM)
-        return (error_r + error_t) / tf.cast(self.batch_size, tf.float32)
+        error_t = tf.losses.mean_squared_error(targets[0], predictions[0], reduction=tf.losses.Reduction.MEAN)
+        # from
+        # https://stackoverflow.com/questions/46355068/keras-loss-function-for-360-degree-prediction
+        diff_r = targets[1] - predictions[1]
+        angle_differences = tf.atan2(tf.sin(diff_r), tf.cos(diff_r))
+        error_r = tf.reduce_sum(tf.square(angle_differences)) * rot_weight / tf.cast(self.batch_size, tf.float32)
+        return error_r + error_t
 
     def cnn(self, input, ksizes, strides, n_channels, use_dropout=False, reuse=True):
         '''Create all the conv layers as specified in the paper.'''
@@ -308,35 +320,45 @@ class VOModel(object):
         tuple(np.ndarray)
             Outputs of ``cnn_activation`` for each time step
         '''
-        return session.run(self.cnn_activations, feed_dict={self.input_images: input_batch,
+        batch_size = input_batch.shape[0]
+        return session.run(self.cnn_activations, feed_dict={self.batch_size: batch_size,
+                                                            self.input_images: input_batch,
                                                             self.target_poses: pose_batch})
 
-    def train(self, session, input_batch, pose_batch, initial_states=None):
+    def train(self, session, input_batch, pose_batch, initial_states=None, return_prediction=False):
         '''Train the network.
 
         Parameters
         ----------
         session :   tf.Session
-                    Session to execute op in
+        Session to execute op in
         input_batch  :  np.ndarray
-                        Array of shape (batch_size, sequence_length, h, w, 6) where two consecutive
-                        rgb images are stacked together.
+        Array of shape (batch_size, sequence_length, h, w, 6) where two consecutive
+        rgb images are stacked together.
         pose_batch  :   np.ndarray
-                        Array of shape (batch_size, sequence_length, 6) with Poses
+        Array of shape (batch_size, sequence_length, 6) with Poses
         initial_states   :   np.ndarray
-                            Array of shape (2, 2, batch_size, memory_size)
+        Array of shape (2, 2, batch_size, memory_size)
 
         Returns
         -------
         tuple(np.ndarray)
-            Outputs of the ``train_step``, ``loss``, and ``rnn_state`` operations.
+            Outputs of the ``train_step``, ``loss``, and ``rnn_state`` operations, and optionally
+            the predictions for r and t at the front
         '''
         batch_size = input_batch.shape[0]
 
         if initial_states is None:
-            initial_states = tensor_from_lstm_tuple(self.get_zero_state(session, batch_size))
+            zero_state = self.get_zero_state(session, batch_size)
+            initial_states = tensor_from_lstm_tuple(zero_state)
 
-        return session.run([self.train_step, self.loss, self.rnn_state],
+        if return_prediction:
+            fetches = [self.y_t, self.y_r,
+                       self.train_step, self.loss, self.rnn_state]
+        else:
+            fetches = [self.train_step, self.loss, self.rnn_state]
+
+        return session.run(fetches,
                            feed_dict={self.batch_size: batch_size,
                                       self.input_images: input_batch,
                                       self.target_poses: pose_batch,
@@ -354,13 +376,11 @@ class VOModel(object):
                         ``"flownet-S.ckpt-0.data-00000-of-00001"``, ``"flownet-S.ckpt-0.meta"``, and
                         ``"flownet-S.ckpt-0.index"``)
         '''
-        global_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=flownet_prefix)
-        # hacky. Can we avoid having the optimizer pollute the scope with its ops?
-        cnn_vars = [var for var in global_vars if 'optimizer' not in var.name]
+        cnn_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=flownet_prefix)
         restorer = tf.train.Saver(cnn_vars)
         restorer.restore(session, filename)
 
-    def test(self, session, input_batch, pose_batch):
+    def test(self, session, input_batch, pose_batch, initial_states=None):
         '''Get network predictions for some input sequence and compute average error.
 
         Parameters
@@ -373,4 +393,15 @@ class VOModel(object):
         pose_batch  :   np.ndarray
                         Array of shape (batch_size, sequence_length, 6) with Poses
         '''
-        pass
+        batch_size = input_batch.shape[0]
+
+        if initial_states is None:
+            initial_states = tensor_from_lstm_tuple(self.get_zero_state(session, batch_size))
+
+        fetches = [*self.predictions, self.loss, self.rnn_state]
+        y_t, y_r, loss, states = session.run(fetches,
+                                             feed_dict={self.batch_size: batch_size,
+                                                        self.target_poses: pose_batch,
+                                                        self.input_images: input_batch,
+                                                        self.lstm_states: initial_states})
+        return y_t, y_r, loss, states
