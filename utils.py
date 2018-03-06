@@ -13,9 +13,9 @@ import numpy as np
 def tensor_from_lstm_tuple(tuples, validate_shape=False):
     '''Create a tensor from a tuple of :py:class:`tf.contrib.rnn.LSTMStateTuple` s.
 
-    .. note:: Error checks
+    .. note::
         We do not check all possible error cases. For instance, the different LSTMStateTuples could
-        not only have differing shapes (which we check for to some extend see ``validate_shape``
+        not only have differing shapes (which we check for to some extent see ``validate_shape``
         parameter), but also the state members ``c`` and ``h`` could differ in their data type (Tensor,
         array), which we *do not* check.
 
@@ -23,8 +23,8 @@ def tensor_from_lstm_tuple(tuples, validate_shape=False):
     Parameters
     ----------
     tuples  :   tuple(LSTMStateTuple)
-                Tuple of N_lstm ``LSTMStateTuple`` s where each of the tuples has members of shape
-                ``(batch_size, memory_size)``
+                Tuple of ``LSTMStateTuple`` s (as many as there are stacked lstm cells) where each
+                of the tuples has members of shape ``(batch_size, memory_size)``
     validate_shape  :   bool
                         Enforce identical shapes of all cell and memory states. This entails that
                         all dimensions must be known. When using variable batch size, set to
@@ -130,7 +130,7 @@ def resize_to_multiple(images, multiples):
     Parameters
     ----------
     images  :   tf.Tensor
-                Tensor of shape [batch, height, width, channels]
+                Tensor of shape ``(batch, height, width, channels)``
     multiples   :   int or tuple
                     The value/s that should evenly divide the resized image's dimensions
 
@@ -154,21 +154,21 @@ def image_pairs(image_sequence, sequence_length):
     6-channel image. If the image sequence length is not evenly divided by the sequence length,
     fewer than the total number of images will be yielded.
 
-    .. note:: Deprecated
+    .. note::
         This function is deprecated by :py:class:`DataManager`
 
 
     Parameters
     ----------
     image_sequence  :   np.ndarray
-                        Array of shape (num, h, w, 3)
+                        Array of shape ``(num, h, w, 3)``
     sequence_length  :  int
                         Number of elements (6-channel imgs) yielded each time
 
     Returns
     -------
     np.ndarray
-        Array of shape (sequence_length, h, w, 6)
+        Array of shape ``(sequence_length, h, w, 6)``
     '''
     N, h, w, c = image_sequence.shape
     for idx in range(0, N, sequence_length):
@@ -200,7 +200,7 @@ def compute_rgb_mean(image_sequence):
     Parameters
     ----------
     image_sequence  :   np.ndarray
-                        Array of shape (N, h, w, c) or (h, w, c)
+                        Array of shape ``(N, h, w, c)`` or ``(h, w, c)``
     '''
     if image_sequence.ndim == 4:
         _, h, w, c = image_sequence.shape
@@ -237,6 +237,7 @@ def convert_large_array(file_in, file_out, dtype, factor=1.0):
     if factor != 1.0:
         np.multiply(dest, factor, out=dest)
 
+
 def subtract_poses(pose_x, pose_y):
     '''Correct subtraction of two poses
 
@@ -253,287 +254,7 @@ def subtract_poses(pose_x, pose_y):
     pose_diff[..., 3:6] = np.arctan2(np.sin(pose_diff[..., 3:6]), np.cos(pose_diff[..., 3:6]))
     return pose_diff
 
-import os
-from glob import glob
-from os.path import join
 from skimage.transform import resize
-
-
-class DataManager(object):
-    '''DataManager class for training and test data handling.
-
-    Attributes
-    ----------
-    dataset_path    :   str
-                        Path to directory containing the test images and poses
-    target_poses    :   tf.Placeholder
-                        Float placeholder of shape (batch_size, sequence_length, 6) with 3
-                        translational and 3 rotational components
-    batch_size      :   int
-                        Batch size of requested data
-    train_test_ratio:   float
-                        Train data size to test data size ratio
-    sequence_length :   int
-                        Sequenth length of requested data
-    debug           :   bool
-                        Debug mode for additional information prints
-    dtype           :   np.dtype
-                        Numpy datatype of stored data
-    N               :   int
-                        Number of batches
-    NTrain          :   int
-                        Number of training batches
-    NTest           :   int
-                        Number of test batches
-    '''
-    def __init__(self,
-                 dataset_path='data/dataset1/',
-                 batch_size=10,
-                 train_test_ratio=0.7,
-                 sequence_length=10,
-                 debug=False,
-                 dtype=np.float32,
-                 resize_to_width=None):
-        '''
-        Parameters
-        ----------
-        dataset_path    :   str
-                            Path to directory containing the test images and poses
-        target_poses    :   tf.Placeholder
-                            Float placeholder of shape (batch_size, sequence_length, 6) with 3
-                            translational and 3 rotational components
-        batch_size      :   int
-                            Batch size of requested data
-        train_test_ratio:   float
-                            Train data size to test data size ratio
-        sequence_length :   int
-                            Sequenth length of requested data
-        debug           :   bool
-                            Debug mode for additional information prints
-        dtype           :   dtype
-                            Numpy datatype of stored data
-        resize_to_width :   int
-                            Resize the file data
-        '''
-
-        if not os.path.exists(dataset_path):
-            raise ValueError(f'Path {dataset_path} does not exist.')
-
-        self.dtype        = dtype
-        self.debug        = debug
-        self.dataset_path = dataset_path
-        self.images_path  = join(dataset_path, 'images')
-        self.poses_path   = join(dataset_path, 'poses')
-
-        image_files = glob(join(self.images_path, '*.npy'))
-        self.N      = len(image_files)
-        self.NTrain = int(self.N * train_test_ratio)
-        self.NTest  = self.N - self.NTrain
-
-        self.num_dec_file = sum(c.isdigit() for c in os.path.basename(image_files[0]))
-
-        self.image_file_template = join(self.images_path, 'image%0') + f'{self.num_dec_file}d.npy'
-        self.pose_file_template  = join(self.poses_path, 'pose%0') + f'{self.num_dec_file}d.npy'
-
-        init_image = self.loadImage(0)
-        if resize_to_width is not None:
-            width_ratio = resize_to_width / init_image.shape[1]
-            scaled_height = np.floor(init_image.shape[0] * width_ratio)
-            init_image = resize(init_image, output_shape=(scaled_height, resize_to_width))
-
-        self.H = init_image.shape[0]
-        self.W = init_image.shape[1]
-        self.C = init_image.shape[2]
-
-        self.sequence_length = sequence_length
-
-        self.batch_size = batch_size
-        # additional frames needed depending on sequence length
-        self.batch_images = np.empty(
-            [self.batch_size, self.sequence_length, self.H, self.W, self.C * 2],
-            dtype=dtype
-        )
-
-        self.batch_poses = np.empty([self.batch_size, self.sequence_length, 6])
-
-        if self.debug:
-            print(f'DataManager found {self.N} images and poses in dataset.')
-            print(f'Image shape: {self.getImageShape()}')
-
-    def getImageShape(self):
-        '''Image shape of one image
-
-        Returns
-        -------
-        tuple(int)
-            Shape of image data
-        '''
-        return (self.H, self.W, self.C)
-
-    def numTestBatches(self):
-        '''Number of test batches
-
-        Returns
-        -------
-        int
-            Number of test batches
-        '''
-        return self.NTest
-
-    def numTrainBatches(self):
-        '''Number of training batches
-
-        Returns
-        -------
-        int
-            Number of training batches
-        '''
-        return self.NTrain
-
-    def __len__(self):
-        '''Number of total batches
-
-        Returns
-        -------
-        int
-            Number of total batches
-        '''
-        return self.N
-
-    def batches(self):
-        '''Get non-overlapping training batches
-
-        Yields
-        -------
-        np.ndarray
-            Images with shape depending on training batch size and sequence size
-        np.ndarray
-            Labels with shape depending on training batch size and sequence size
-        '''
-        # 1D length of batch_size times sequence length
-        chunk_size = self.batch_size * self.sequence_length
-        for batch_start_idx in range(0, self.NTrain, chunk_size):
-            record_in_batch = 0
-            for sequence_start_idx in range(batch_start_idx, batch_start_idx + chunk_size,
-                                            self.sequence_length):
-
-                sequence_end_idx = sequence_start_idx + self.sequence_length + 1
-                if sequence_end_idx >= self.NTrain:
-                    return
-                image_indices = np.arange(sequence_start_idx, sequence_end_idx)
-
-                # generate sequences
-                images = self.loadImages(image_indices)
-                poses  = self.loadPoses(image_indices)
-
-                self.batch_images[record_in_batch, ..., :3] = images[:-1]
-                self.batch_images[record_in_batch, ..., 3:] = images[1:]
-
-                # subtract first pose from all
-                # absolute pose to first pose
-                self.batch_poses[record_in_batch, ...] = subtract_poses(poses[1:], poses[0])
-                record_in_batch += 1
-
-            yield self.batch_images, self.batch_poses
-
-    def test_batches(self):
-        '''Test batches
-
-        Yields
-        -------
-        np.ndarray
-            Images with shape depending on test batch size and sequence size
-        np.ndarray
-            Labels with shape depending on test batch size and sequence size
-        '''
-        # 1D length of batch_size times sequence length
-        chunk_size = self.batch_size * self.sequence_length
-        for batch_start_idx in range(self.NTrain-1, self.N, chunk_size):
-            record_in_batch = 0
-            for sequence_start_idx in range(batch_start_idx, batch_start_idx + chunk_size,
-                                            self.sequence_length):
-
-                sequence_end_idx = sequence_start_idx + self.sequence_length + 1
-                if sequence_end_idx >= self.N:
-                    return
-                image_indices = np.arange(sequence_start_idx, sequence_end_idx)
-
-                # generate sequences
-                images = self.loadImages(image_indices)
-                poses  = self.loadPoses(image_indices)
-
-                self.batch_images[record_in_batch, ..., :3] = images[:-1]
-                self.batch_images[record_in_batch, ..., 3:] = images[1:]
-
-                # subtract first pose from all
-                # absolute pose to first pose
-                self.batch_poses[record_in_batch, ...] = subtract_poses(poses[1:], poses[0])
-                record_in_batch += 1
-
-            yield self.batch_images, self.batch_poses
-
-    def loadImage(self, id):
-        '''Loads image with id < N
-
-        Parameters
-        -------
-        id    :   int
-                  id of image < N
-        Returns
-        -------
-        np.ndarray
-            Image
-        '''
-        img = np.squeeze(np.load(self.image_file_template % id))
-        return img
-
-    def saveImage(self, id, img):
-        '''Saves image with id
-
-        Parameters
-        -------
-        id    :   int
-                  id of image
-        img   :   np.ndarray
-                  image to save
-        '''
-        np.save(self.image_file_template % id, img)
-
-    def loadImages(self, ids):
-        '''loads muliple images
-
-        Parameters
-        ----------
-        ids :   list(int)
-                List of ids to fetch
-        '''
-        num_images = len(ids)
-        images     = np.empty([num_images, self.H, self.W, self.C], dtype=self.dtype)
-        for idx in range(0, num_images):
-            # right colors:
-            img = self.loadImage(ids[idx])
-            if img.shape != (self.H, self.W, self.C):
-                images[idx] = resize(img, output_shape=(self.H, self.W), preserve_range=True)
-            else:
-                images[idx] = img
-        return images
-
-    def loadPose(self, id):
-        '''Ooads pose for id'''
-        return np.load(self.pose_file_template % id)
-
-    def savePose(self, id, pose):
-        '''Saves pose'''
-        np.save(self.pose_file_template % id , pose)
-
-    def loadPoses(self, ids):
-        '''Loads multiple poses'''
-        num_poses = len(ids)
-        poses     = np.empty([num_poses, 6])
-        for idx in range(0, num_poses):
-            poses[idx] = self.loadPose(ids[idx])
-        return poses
-
 
 class OptimizerSpec(dict):
     '''Encapsulate all the info needed for creating any kind of optimizer. Learning rate scheduling

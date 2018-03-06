@@ -17,7 +17,8 @@ import os.path
 import os
 
 from model import VOModel
-from utils import DataManager, OptimizerSpec
+from utils import OptimizerSpec
+from data_manager import DataManager
 from performance_visualizer import PerformanceVisualizer
 
 def make_parser():
@@ -125,6 +126,8 @@ def main():
                 print(f'Model saved in file: {model_filename}')
 
             print(f'Average test loss across {count} batches: {avg_loss:04.5f}')
+
+            data_manager.shuffleBatches()
 
 
 if __name__ == '__main__':
