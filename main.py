@@ -5,7 +5,6 @@
 .. moduleauthor:: Rasmus Diederichsen
 
 '''
-
 import sys
 import numpy as np
 # np.random.seed(1)
@@ -15,11 +14,13 @@ import tensorflow as tf
 from os.path import join
 import os.path
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from model import VOModel
 from utils import OptimizerSpec
 from data_manager import DataManager
 from performance_visualizer import PerformanceVisualizer
+
 
 def make_parser():
     '''Function returning parser is necessary for sphinx-argparse'''
@@ -50,6 +51,7 @@ def make_parser():
     parser.add_argument('-c', '--load-checkpoint', action='store_true', default=False,
                         help='Load checkpoint from checkpoints/deepvo.ckpt')
     return parser
+
 
 def main():
 
