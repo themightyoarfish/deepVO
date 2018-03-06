@@ -127,6 +127,8 @@ def main():
 
             print(f'Average test loss across {count} batches: {avg_loss:04.5f}')
 
+            data_manager.shuffleBatches()
+
 
 if __name__ == '__main__':
     main()
