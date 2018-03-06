@@ -244,10 +244,10 @@ In this Section the data acquisition for training and testing is presented (see 
 
 \textbf{Data Handling}
 
-The deepVO model is trained by pairwise stacked images in a sequence. Each batch contains a preset number of these sequences. The DataManager is used to arrange the data in this format. 
+The deepVO model is trained by pairwise stacked images in a sequence. Each batch contains a preset number of these sequences. The DataManager is used to arrange the data to this format.
 
 \textbf{Stacking}
-Each image has to be stacked with its privious image. This operation is solved by an index shift over the list of images:
+Each image has to be stacked with its privious image. This operation is solved by an index shift over the list of images as shown in figure~\ref{fig:stacking}:
 
 % Bild?
 % [:-1]
@@ -256,22 +256,24 @@ Each image has to be stacked with its privious image. This operation is solved b
 
 \begin{figure}[tbh]
     \centering
-    \includegraphics[width=0.2\linewidth]{stacking.png}
+    \includegraphics[width=0.4\linewidth]{stacking.png}
     \caption{Explantion images stacked pairwise. The numbers are the indices of the images.}
-    \label{fig:reference_frame}
+    \label{fig:stacking}
 \end{figure}
 
 \textbf{Sequences}
-Each batch includes different non overlapping sequences of image stacks and poses. Each image stack is labeled by a seperate pose, which is relative to the first pose of the sequence.
+Each batch includes different non overlapping sequences of image stacks and poses. Each image stack is labeled by a seperate pose, which is relative to the first pose of the sequence. This is calculated by the difference of the current pose in the sequence and the first pose to get the relative distance of these two poses. The angle distance of angle a and b is defined as:
+
+\begin{equation}
+ d(a,b) = \atantwo(\sin(a-b), \cos(a-b))
+\end{equation}
+
 
 \textbf{Batching}
-In the DataManager batches are seperated in training and test batches. With the parameter \texttt{train_test_ratio} determines the ratio of train to test batches and defaults to 70\% training batches and 30\% test batches. After an epoch the training batches and test batches can be shuffled by chance.
+In the DataManager batches are seperated in training and test batches. With the parameter $train_test_ratio$ determines the ratio of train to test batches and defaults to 70\% training batches and 30\% test batches. After an epoch the training batches and test batches can be shuffled by chance.
 
 \textbf{Memory Consumption}
 Because of the high memory consumption of the deepVO model, the DataManager has to spare the memory by loading only the currently required batches.
-
-
-
 
 
 
