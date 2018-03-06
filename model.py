@@ -21,14 +21,14 @@ class VOModel(object):
     Attributes
     ----------
     input_images    :   tf.Placeholder
-                        Float placeholder with shape (batch_size, sequence_length, h, w, c * 2).
+                        Float placeholder with shape ``(batch_size, sequence_length, h, w, c * 2)``.
                         This tensor contains the stacked input images.
     target_poses    :   tf.Placeholder
-                        Float placeholder of shape (batch_size, sequence_length, 6) with 3
+                        Float placeholder of shape ``(batch_size, sequence_length, 6)`` with 3
                         translational and 3 rotational components
     lstm_states :   tf.Placeholder
                     Float placeholder used to feed the initial lstm state into the network. The shape
-                    is (2, 2, batch_size, memory_size) since we have 2 lstm cells and cell and hidden
+                    is ``(2, 2, batch_size, memory_size)`` since we have 2 lstm cells and cell and hidden
                     states are contained in this tensor. THE CELL STATE (TUPLE MEMBER H) MUST COME
                     BEFORE THE HIDDEN STATE (TUPLE MEMBER C).
     sequence_length :   int
@@ -284,12 +284,12 @@ class VOModel(object):
         session :   tf.Session
                     Session to execute op in
         input_batch  :  np.ndarray
-                        Array of shape (batch_size, sequence_length, h, w, 6) where two consecutive
+                        Array of shape ``(batch_size, sequence_length, h, w, 6)`` where two consecutive
                         rgb images are stacked together.
         pose_batch  :   np.ndarray
-                        Array of shape (batch_size, sequence_length, 6) with Poses
+                        Array of shape ``(batch_size, sequence_length, 6)`` with Poses
         initial_states   :   np.ndarray
-                            Array of shape (2, 2, batch_size, memory_size)
+                            Array of shape ``(2, 2, batch_size, memory_size)``
 
         Returns
         -------
@@ -310,10 +310,10 @@ class VOModel(object):
         session :   tf.Session
                     Session to execute op in
         input_batch  :  np.ndarray
-                        Array of shape (batch_size, sequence_length, h, w, 6) where two consecutive
+                        Array of shape ``(batch_size, sequence_length, h, w, 6)`` where two consecutive
                         rgb images are stacked together.
         pose_batch :   np.ndarray
-                        Array of shape (batch_size, sequence_length, 6) with Poses
+                        Array of shape ``(batch_size, sequence_length, 6)`` with Poses
 
         Returns
         -------
@@ -331,14 +331,14 @@ class VOModel(object):
         Parameters
         ----------
         session :   tf.Session
-        Session to execute op in
+                    Session to execute op in
         input_batch  :  np.ndarray
-        Array of shape (batch_size, sequence_length, h, w, 6) where two consecutive
-        rgb images are stacked together.
+                        Array of shape ``(batch_size, sequence_length, h, w, 6)`` where two consecutive
+                        rgb images are stacked together.
         pose_batch  :   np.ndarray
-        Array of shape (batch_size, sequence_length, 6) with Poses
-        initial_states   :   np.ndarray
-        Array of shape (2, 2, batch_size, memory_size)
+                        Array of shape ``(batch_size, sequence_length, 6)`` with Poses
+        initial_states   :  np.ndarray
+                            Array of shape ``(2, 2, batch_size, memory_size)``
 
         Returns
         -------
@@ -388,10 +388,10 @@ class VOModel(object):
         session :   tf.Session
                     Session to run ops in
         input_batch  :  np.ndarray
-                        Array of shape (batch_size, sequence_length, h, w, 6) where two consecutive
+                        Array of shape ``(batch_size, sequence_length, h, w, 6)`` where two consecutive
                         rgb images are stacked together.
         pose_batch  :   np.ndarray
-                        Array of shape (batch_size, sequence_length, 6) with Poses
+                        Array of shape ``(batch_size, sequence_length, 6)`` with Poses
         '''
         batch_size = input_batch.shape[0]
 
