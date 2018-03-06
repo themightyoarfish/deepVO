@@ -9,7 +9,6 @@ Convolutional Neural Networks by Wang et al.
 '''
 import tensorflow as tf
 from math import ceil
-from tensorflow.contrib.rnn import *
 import numpy as np
 from utils import tensor_from_lstm_tuple, OptimizerSpec, resize_to_multiple, conv_layer
 from flownet import *
@@ -170,6 +169,9 @@ class VOModel(object):
             n_rnn_output       = memory_size  # number of activations per batch
             kernel_initializer = tf.random_normal_initializer(stddev=np.sqrt(2 / n_rnn_output))
             # predictions
+            # I know we shouldn't use tf.layers but since dense + conv are easy to implement by
+            # oneself we decided to remove this possible source of errors and focus on the many
+            # others
             y = tf.layers.dense(rnn_outputs, 6, kernel_initializer=kernel_initializer)
             # decompose into translational and rotational component
             self.y_t, self.y_r = tf.split(y, 2, axis=2)
@@ -233,6 +235,9 @@ class VOModel(object):
                     activation = tf.nn.relu if index < len(ksizes) - 1 else None
 
                     if not self.use_flownet:
+                        # I know we shouldn't use tf.layers but since dense + conv are easy to
+                        # implement by oneself we decided to remove this possible source of errors
+                        # and focus on the many others
                         output = tf.layers.conv2d(output,
                                                   channels,
                                                   kernel_size=[ksize, ksize],
