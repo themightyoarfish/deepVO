@@ -17,7 +17,8 @@ import os.path
 import os
 
 from model import VOModel
-from utils import DataManager, OptimizerSpec
+from utils import OptimizerSpec
+from data_manager import DataManager
 from performance_visualizer import PerformanceVisualizer
 
 def make_parser():
