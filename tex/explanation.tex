@@ -196,21 +196,13 @@ In this Section the data acquisition for training and testing is presented (see 
     \label{fig:setup}
 \end{figure}
 
-% TODO: 
-% - Das ist der Roboter
-% - Eigene Daten aufnehmen
-%   - ROSbags mit Images und poses
-%       - ApproximateTimeSynchronizer
-% 
-% - preprocessing
-%   - float/mean images
-% 
-% - Data Handling
-%   - Sequences 
-%       - relative poses
-%       - stacked images
-%   - Shuffling
-%   - test & training data batches
+In order to train the DeepVO model we have to gather data. While the paper used the well known KITTI \footnote{\url{http://www.cvlibs.net/datasets/kitti/eval_odometry.php}} dataset for training, we decided to create our own dataset. The reason is that our main motivation for that particular project lies in the field of robotics. The resulting visual odometry system should be deployed on the robots of the \emph{Knowledge-based Systems} group. One of those robots, called \emph{ceres}, is shown in Figure~\ref{fig:robot}. Besides plenty of other sensors the robot carries a camera and an odometer. While the robot is in motion, the latter sensor returns a current relative pose with respect to the robots starting position (see Section~\ref{sec:introduction}). Additionally the raw sensor data is processed with an \emph{extended Kalman-Filter} (EKF) in order to eliminate errors. This localization setup is well-tested throughout many robotic applications, works very reliably and thus provides good ground truth data for our training labels.
+
+The actual data acquisition is done by simply driving around with the robot in our lab and record the poses form the EKF and the images from the camera. The recording is done with the tool \emph{rosbag} which is part of the \emph{Robot Operating System}\footnote{\url{http://ros.org/}} (ROS), a micro-service based framework frequently used for robotic applications. Regarding the camera, we have no control over the exposure time, rendering images that might be affected strongly by lighting conditions. In order to reduce that problem, we only used indoor lightning and sealed the windows.
+After recording all the data we have to create image-pose pairs as a prior step to creating sequences of robot movements. For that we wrote a ROS node (ROS slang for a program more or less) in C++ that finds matches between images and poses depending on their timestamps. In the past we sometimes faced problems with timestamps that were off slightly. This may have been caused by overloaded machines running the actual hardware drivers and thusly create timestamps to late. Manual inspection always showed senseful data, but of course this validation technique is random and therefore missing potential errors. This could be a possible point of error for later investigation.
+The node will create matching single files for every image and pose as we had serious memory problems loading all image matrices at once. Despite loading all matrices from the hard disk, the data loading is quite fast still.
+
+As a next step we have to pre-process the images. First the images are converted to float such that the RGB values lie in $[0,1]$. Also we calculate the mean for each of the RGB channels and subtract it from every image in order to further normalize the data.
 
 
 % ------------------- %
