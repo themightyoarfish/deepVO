@@ -11,8 +11,8 @@ from argparse import ArgumentParser
 import numpy as np
 import sys
 
-from utils import DataManager, compute_rgb_mean
-
+from utils import compute_rgb_mean
+from data_manager import DataManager
 
 def main():
     parser = ArgumentParser('Preprocess robot data vor DeepVO, This process is destructive.')
