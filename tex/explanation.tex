@@ -168,7 +168,7 @@ $[-\pi,\pi]$.
 % ------------------- %
 % SECTION: EVALUATION %
 % ------------------- %
-\section{Evaluation}
+\section{Training \& Evaluation}
 \label{sec:evaluation}
 In this Section the data acquisition for training and testing is presented (see Section~\ref{sec:evaluation:data}), as well as the training progress and its performance results (see Section~\ref{sec:evaluation:results}).
 
@@ -181,13 +181,25 @@ In this Section the data acquisition for training and testing is presented (see 
 % TODO: What data are we working with
 % TODO: --> Show images of robot and the camera and maybe poses in rviz
 
+% --------------------------- %
+% SUBSECTION: TRAINING        %
+% --------------------------- %
+\subsection{Training}
+\label{sec:evaluation:training}
+
+For training, we evaluated minimal parameters on a 1050Ti GTX card with 4GB of
+VRAM, as well as a parallel computer with 56 Intel Xeon cpus (which turned out
+to be useless), and, lastly, several AWS P2 and P3 instances, with Tesla K80 and
+V100 cards, respectively. However, we were not able to obtain useful results in
+the limited time available to us, since practical parameter combinations quickly
+exceeded any GPU memory.
+
 
 % ------------------- %
 % SUBSECTION: RESULTS %
 % ------------------- %
 \subsection{Results}
 \label{sec:evaluation:results}
-% TODO: Show the results
 
 
 % ---------------------- %
@@ -195,7 +207,9 @@ In this Section the data acquisition for training and testing is presented (see 
 % ---------------------- %
 \section{Room for Nonsense}
 \label{sec:nonsense}
-% TODO: Whatever is missing put it in here?!
+The authors would like to thank Thomes Wiemann for repeatedly failing to follow
+through on his promise to secure an Nvidia hardware grant in order to obtain a
+potent graphics card.
 
 
 % --------------------- %
