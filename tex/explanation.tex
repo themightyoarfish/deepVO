@@ -214,13 +214,13 @@ performance results (see \autoref{sec:evaluation:results}).
     \centering
     \begin{subfigure}[t]{0.6\linewidth}
             \centering
-            \includegraphics[width=0.9\linewidth]{robot_small.jpg}
+            \includegraphics[width=0.7\linewidth]{robot_small.jpg}
             \caption[]{The ceres robot used for data acquisition.}
             \label{fig:robot}
     \end{subfigure}
     \begin{subfigure}[t]{0.39\linewidth}
             \centering
-            \includegraphics[width=0.75\linewidth]{image_pair.png}
+            \includegraphics[width=0.55\linewidth]{image_pair.png}
             \caption[]{Exemplary successive images taken from the robots camera.}
             \label{fig:camera_images}
     \end{subfigure}
@@ -228,7 +228,7 @@ performance results (see \autoref{sec:evaluation:results}).
     \label{fig:setup}
 \end{figure}
 
-In order to train the DeepVO model we have to gather data. While the paper used the well known KITTI \footnote{\url{http://www.cvlibs.net/datasets/kitti/eval_odometry.php}} dataset for training, we decided to create our own dataset. The reason is that our main motivation for that particular project lies in the field of robotics. The resulting visual odometry system should be deployed on the robots of the \emph{Knowledge-based Systems} group. One of those robots, called \emph{ceres}, is shown in Figure~\ref{fig:robot}. Besides plenty of other sensors the robot carries a camera and an odometer. While the robot is in motion, the latter sensor returns a current relative pose with respect to the robots starting position (see Section~\ref{sec:introduction}). Additionally the raw sensor data is processed with an \emph{extended Kalman-Filter} (EKF) in order to eliminate errors. This localization setup is well-tested throughout many robotic applications, works very reliably and thus provides good ground truth data for our training labels.
+In order to train the DeepVO model we have to gather data. While the paper used the well known \emph{KITTI} \footnote{\url{http://www.cvlibs.net/datasets/kitti/eval_odometry.php}} dataset for training, we decided to create our own dataset. The reason is that our main motivation for that particular project lies in the field of robotics. The resulting visual odometry system should be deployed on the robots of the \emph{Knowledge-based Systems} group. One of those robots, called \emph{ceres}, is shown in Figure~\ref{fig:robot}. Besides plenty of other sensors the robot carries a camera and an odometer. While the robot is in motion, the latter sensor returns a current relative pose with respect to the robots starting position (see Section~\ref{sec:introduction}). Additionally the raw sensor data is processed with an \emph{extended Kalman-Filter} (EKF) in order to eliminate errors. This localization setup is well-tested throughout many robotic applications, works very reliably and thus provides good ground truth data for our training labels.
 
 The actual data acquisition is done by simply driving around with the robot in our lab and record the poses form the EKF and the images from the camera. The recording is done with the tool \emph{rosbag} which is part of the \emph{Robot Operating System}\footnote{\url{http://ros.org/}} (ROS), a micro-service based framework frequently used for robotic applications. Regarding the camera, we have no control over the exposure time, rendering images that might be affected strongly by lighting conditions. In order to reduce that problem, we only used indoor lightning and sealed the windows.
 After recording all the data we have to create image-pose pairs as a prior step to creating sequences of robot movements. For that we wrote a ROS node (ROS slang for a program more or less) in C++ that finds matches between images and poses depending on their timestamps. In the past we sometimes faced problems with timestamps that were off slightly. This may have been caused by overloaded machines running the actual hardware drivers and thusly create timestamps to late. Manual inspection always showed senseful data, but of course this validation technique is random and therefore missing potential errors. This could be a possible point of error for later investigation.
@@ -250,12 +250,6 @@ As a next step we have to pre-process the images. First the images are converted
 
 
 \subsubsection{Data Handling}
-
-The deepVO model is trained by pairwise stacked images in a sequence. Each batch contains a preset number of these sequences. The DataManager is used to arrange the data in this format.
-
-\subsubsection{Stacking}
-Each image has to be stacked with its privious image. This operation is solved by an index shift over the list of images:
-
 % Bild?
 % [:-1]
 % [1:]
@@ -263,25 +257,20 @@ Each image has to be stacked with its privious image. This operation is solved b
 
 \begin{figure}[tbh]
     \centering
-    \includegraphics[width=0.8\linewidth]{stacking.png}
+    \includegraphics[width=0.6\linewidth]{stacking.png}
     \caption{Explantion images stacked pairwise. The numbers are the indices of the images.}
     \label{fig:image_stacking}
 \end{figure}
-
-\subsubsection{Sequences}
-Each batch includes different non overlapping sequences of image stacks and
+The deepVO model is trained by pairwise stacked images in a sequence. Each batch contains a preset number of these sequences. The \texttt{DataManager} is used to arrange the data in this format. Each image has to be stacked with its previous image. This operation is solved by an index shift over the list of images as depicted in \autoref{fig:image_stacking}. Each 
+batch includes different non overlapping sequences of image stacks and
 poses. Each image stack is labeled by a seperate pose, which is relative to the
-first pose of the sequence.
-
-\subsubsection{Batching}
-In the DataManager batches are seperated in training and test batches. With the
-parameter \texttt{train\_test\_ratio} determines the ratio of train to test
+first pose of the sequence. In the DataManager batches are seperated in training 
+and test batches. The parameter \texttt{train\_test\_ratio} determines the ratio 
+of training to testing
 batches and defaults to 70\% training batches and 30\% test batches. After an
-epoch the training batches and test batches can be shuffled by chance.
-
-\subsubsection{Memory Consumption}
-Because of the high memory consumption of the deepVO model, the DataManager has
-to spare the memory by loading only the currently required batches.
+epoch the training batches and test batches are be shuffled in order to avoid learning
+sequential relationships. Because of the high memory consumption of the deepVO model, 
+the DataManager has to spare the memory by loading only the currently required batches.
 
 
 
