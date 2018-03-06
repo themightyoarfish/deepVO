@@ -8,6 +8,7 @@ Convolutional Neural Networks by Wang et al.
 
 '''
 import tensorflow as tf
+from tensorflow.contrib.rnn import *
 from math import ceil
 import numpy as np
 from utils import tensor_from_lstm_tuple, OptimizerSpec, resize_to_multiple, conv_layer
@@ -130,8 +131,8 @@ class VOModel(object):
             lstm1 = LSTMCell(memory_size, state_is_tuple=True)
             if self.use_dropout:
                 lstm_keep_probs = [0.7, 0.8]
-                lstm0 = tf.contrib.rnn.DropoutWrapper(lstm0, output_keep_prob=lstm_keep_probs[0])
-                lstm1 = tf.contrib.rnn.DropoutWrapper(lstm1, output_keep_prob=lstm_keep_probs[1])
+                lstm0 = DropoutWrapper(lstm0, output_keep_prob=lstm_keep_probs[0])
+                lstm1 = DropoutWrapper(lstm1, output_keep_prob=lstm_keep_probs[1])
             self.rnn = MultiRNNCell([lstm0, lstm1])
             self.zero_state = self.rnn.zero_state(self.batch_size, tf.float32)
 
