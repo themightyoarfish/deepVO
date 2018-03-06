@@ -20,6 +20,7 @@ from model import VOModel
 from utils import OptimizerSpec
 from data_manager import DataManager
 from performance_visualizer import PerformanceVisualizer
+from matplotlib import pyplot as plt
 
 
 def make_parser():
@@ -102,6 +103,7 @@ def main():
 
         print('Start training...')
         best_loss = None
+        losses = []
         for e in range(args.epochs):
             print(f'Epoch {e+1} of {args.epochs}')
             # reset state after each batch of consecutive sequences
@@ -120,6 +122,7 @@ def main():
                 count += 1
 
             avg_loss /= count
+            losses.append(avg_loss)
             if not best_loss or avg_loss < best_loss:
                 best_loss = avg_loss
                 if not os.path.exists(checkpoint_dir):
@@ -130,6 +133,13 @@ def main():
             print(f'Average test loss across {count} batches: {avg_loss:04.5f}')
 
             data_manager.shuffleBatches()
+
+        f, ax = plt.subplots(1)
+        ax.plot(losses)
+        ax.set_title('Losses with 7/3 train-test split)')
+        ax.set_xlabel('epoch')
+        ax.set_ylabel('Test loss')
+        f.savefig('losses.pdf')
 
 
 if __name__ == '__main__':
