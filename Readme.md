@@ -1,6 +1,6 @@
 # A TensorFlow implementation of _DeepVO: Towards End-to-End Visual Odometry with Deep Recurrent Convolutional Neural Networks_
 
-This is our submission for the ANN with TensorFlow course, winter 2017.
+This is our submission for the ANN with TensorFlow course, winter 2017. **Please note that this implementation does not seem entirely correct. Convergence was observed only on a dataset with random moves forwards and backwards, without rotation.**
 
 ## Data Acquisition
 In order to make use of the full 720 resolution of the LifeCam 3000, you must do two things
