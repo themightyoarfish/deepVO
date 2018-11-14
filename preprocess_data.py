@@ -14,23 +14,56 @@ import sys
 from utils import compute_rgb_mean
 from data_manager import DataManager
 
+
 def main():
-    parser = ArgumentParser('Preprocess robot data vor DeepVO, This process is destructive.')
-    parser.add_argument('-d', '--data', type=str, required=True,
-                        help='Path to dataset (a folder with "images" and "poses" subfolders.)')
-    parser.add_argument('-f', '--to-float', required=False, default=False,
-                        action='store_true', help='Convert images array to float')
-    parser.add_argument('-m', '--mean-normalize', required=False, default=False,
-                        action='store_true', help='Subtract rgb mean from images')
-    parser.add_argument('-s', '--show', required=False, default=False,
-                        action='store_true', help='Show the images')
-    parser.add_argument('-p', '--pose', required=False, default=False,
-                        action='store_true', help='Add pi to poses (for range 0-2pi)')
-    parser.add_argument('-sp', '--subpi', required=False, default=False,
-                        action='store_true', help='Add pi to poses (for range -pi - +pi)')
+    parser = ArgumentParser(
+        'Preprocess robot data vor DeepVO, This process is destructive.')
+    parser.add_argument(
+        '-d',
+        '--data',
+        type=str,
+        required=True,
+        help='Path to dataset (a folder with "images" and "poses" subfolders.)'
+    )
+    parser.add_argument(
+        '-f',
+        '--to-float',
+        required=False,
+        default=False,
+        action='store_true',
+        help='Convert images array to float')
+    parser.add_argument(
+        '-m',
+        '--mean-normalize',
+        required=False,
+        default=False,
+        action='store_true',
+        help='Subtract rgb mean from images')
+    parser.add_argument(
+        '-s',
+        '--show',
+        required=False,
+        default=False,
+        action='store_true',
+        help='Show the images')
+    parser.add_argument(
+        '-p',
+        '--pose',
+        required=False,
+        default=False,
+        action='store_true',
+        help='Add pi to poses (for range 0-2pi)')
+    parser.add_argument(
+        '-sp',
+        '--subpi',
+        required=False,
+        default=False,
+        action='store_true',
+        help='Add pi to poses (for range -pi - +pi)')
     args = parser.parse_args()
 
-    data_manager = DataManager(args.data, dtype=np.float32, batch_size=1, sequence_length=1)
+    data_manager = DataManager(
+        args.data, dtype=np.float32, batch_size=1, sequence_length=1)
     if args.to_float:
         to_float(data_manager)
 
@@ -78,7 +111,7 @@ def mean_normalize(data_manager):
     assert data_manager.dtype == np.float32
     N = len(data_manager)
     print(f'Mean-normalizing {data_manager.dataset_path}/images/*.npy ...')
-    mean_accumlator = np.zeros((3,), dtype=np.float32)
+    mean_accumlator = np.zeros((3, ), dtype=np.float32)
 
     # run over entire dataset to compute mean (fucking inefficient but I have other shit to do)
     for idx in range(N):

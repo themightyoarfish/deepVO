@@ -4,6 +4,7 @@ from os.path import join
 import numpy as np
 from skimage.transform import resize
 
+
 class DataManager(object):
     '''DataManager class for training and test data handling.
 
@@ -31,6 +32,7 @@ class DataManager(object):
     NTest           :   int
                         Number of test batches
     '''
+
     def __init__(self,
                  dataset_path='data/dataset1/',
                  batch_size=10,
@@ -64,27 +66,31 @@ class DataManager(object):
         if not os.path.exists(dataset_path):
             raise ValueError('Path ' + dataset_path + ' does not exist.')
 
-        self.dtype        = dtype
-        self.debug        = debug
+        self.dtype = dtype
+        self.debug = debug
         self.dataset_path = dataset_path
-        self.images_path  = join(dataset_path, 'images')
-        self.poses_path   = join(dataset_path, 'poses')
+        self.images_path = join(dataset_path, 'images')
+        self.poses_path = join(dataset_path, 'poses')
 
         image_files = glob(join(self.images_path, '*.npy'))
-        self.N      = len(image_files)
+        self.N = len(image_files)
         self.NTrain = int(self.N * train_test_ratio)
-        self.NTest  = self.N - self.NTrain
+        self.NTest = self.N - self.NTrain
 
-        self.num_dec_file = sum(c.isdigit() for c in os.path.basename(image_files[0]))
+        self.num_dec_file = sum(
+            c.isdigit() for c in os.path.basename(image_files[0]))
 
-        self.image_file_template = join(self.images_path, 'image%0') + str(self.num_dec_file) + 'd.npy'
-        self.pose_file_template  = join(self.poses_path, 'pose%0') + str(self.num_dec_file) + 'd.npy'
+        self.image_file_template = join(self.images_path, 'image%0') + str(
+            self.num_dec_file) + 'd.npy'
+        self.pose_file_template = join(self.poses_path, 'pose%0') + str(
+            self.num_dec_file) + 'd.npy'
 
         init_image = self.loadImage(0)
         if resize_to_width is not None:
             width_ratio = resize_to_width / init_image.shape[1]
             scaled_height = np.floor(init_image.shape[0] * width_ratio)
-            init_image = resize(init_image, output_shape=(scaled_height, resize_to_width))
+            init_image = resize(
+                init_image, output_shape=(scaled_height, resize_to_width))
 
         self.H = init_image.shape[0]
         self.W = init_image.shape[1]
@@ -94,33 +100,39 @@ class DataManager(object):
         self.batch_size = batch_size
         self.chunk_size = self.batch_size * self.sequence_length
 
-        self.batch_positions = np.arange(0,self.N,self.chunk_size)
+        self.batch_positions = np.arange(0, self.N, self.chunk_size)
 
         self.num_batches = self.batch_positions.shape[0]
-        self.num_batches_train = int(self.batch_positions.shape[0] * train_test_ratio)
+        self.num_batches_train = int(
+            self.batch_positions.shape[0] * train_test_ratio)
         self.num_batches_test = self.num_batches - self.num_batches_train
 
-        self.batch_positions_train = self.batch_positions[:self.num_batches_train]
-        self.batch_positions_test = self.batch_positions[self.num_batches_train:]
-
+        self.batch_positions_train = self.batch_positions[:self.
+                                                          num_batches_train]
+        self.batch_positions_test = self.batch_positions[
+            self.num_batches_train:]
 
         if self.debug:
-            print("Number of batches for training: " + str(self.num_batches_train) )
-            print("Number of batches for testing: " + str(self.num_batches_test) )
+            print("Number of batches for training: " +
+                  str(self.num_batches_train))
+            print("Number of batches for testing: " +
+                  str(self.num_batches_test))
 
         self.shuffleBatches()
 
         # additional frames needed depending on sequence length
         self.batch_images = np.empty(
-            [self.batch_size, self.sequence_length, self.H, self.W, self.C * 2],
-            dtype=dtype
-        )
+            [
+                self.batch_size, self.sequence_length, self.H, self.W,
+                self.C * 2
+            ],
+            dtype=dtype)
 
         self.batch_poses = np.empty([self.batch_size, self.sequence_length, 6])
 
         if self.debug:
             print('DataManager found %d images and poses in dataset.' % self.N)
-            print('Image shape: ' + str(self.getImageShape()) )
+            print('Image shape: ' + str(self.getImageShape()))
 
     def getImageShape(self):
         '''Image shape of one image
@@ -176,7 +188,8 @@ class DataManager(object):
         for batch_start_idx in self.batch_positions_train:
             record_in_batch = 0
             continue_var = False
-            for sequence_start_idx in range(batch_start_idx, batch_start_idx +self.chunk_size,
+            for sequence_start_idx in range(batch_start_idx,
+                                            batch_start_idx + self.chunk_size,
                                             self.sequence_length):
 
                 sequence_end_idx = sequence_start_idx + self.sequence_length + 1
@@ -187,14 +200,15 @@ class DataManager(object):
 
                 # generate sequences
                 images = self.loadImages(image_indices)
-                poses  = self.loadPoses(image_indices)
+                poses = self.loadPoses(image_indices)
 
                 self.batch_images[record_in_batch, ..., :3] = images[:-1]
                 self.batch_images[record_in_batch, ..., 3:] = images[1:]
 
                 # subtract first pose from all
                 # absolute pose to first pose
-                self.batch_poses[record_in_batch, ...] = self._subtract_poses(poses[1:], poses[0])
+                self.batch_poses[record_in_batch, ...] = self._subtract_poses(
+                    poses[1:], poses[0])
                 record_in_batch += 1
 
             if not continue_var:
@@ -214,7 +228,8 @@ class DataManager(object):
         for batch_start_idx in self.batch_positions_test:
             record_in_batch = 0
             continue_var = False
-            for sequence_start_idx in range(batch_start_idx, batch_start_idx + self.chunk_size,
+            for sequence_start_idx in range(batch_start_idx,
+                                            batch_start_idx + self.chunk_size,
                                             self.sequence_length):
 
                 sequence_end_idx = sequence_start_idx + self.sequence_length + 1
@@ -226,14 +241,15 @@ class DataManager(object):
 
                 # generate sequences
                 images = self.loadImages(image_indices)
-                poses  = self.loadPoses(image_indices)
+                poses = self.loadPoses(image_indices)
 
                 self.batch_images[record_in_batch, ..., :3] = images[:-1]
                 self.batch_images[record_in_batch, ..., 3:] = images[1:]
 
                 # subtract first pose from all
                 # absolute pose to first pose
-                self.batch_poses[record_in_batch, ...] = self._subtract_poses(poses[1:], poses[0])
+                self.batch_poses[record_in_batch, ...] = self._subtract_poses(
+                    poses[1:], poses[0])
                 record_in_batch += 1
 
             if not continue_var:
@@ -275,12 +291,14 @@ class DataManager(object):
                 List of ids to fetch
         '''
         num_images = len(ids)
-        images     = np.empty([num_images, self.H, self.W, self.C], dtype=self.dtype)
+        images = np.empty(
+            [num_images, self.H, self.W, self.C], dtype=self.dtype)
         for idx in range(0, num_images):
             # right colors:
             img = self.loadImage(ids[idx])
             if img.shape != (self.H, self.W, self.C):
-                images[idx] = resize(img, output_shape=(self.H, self.W), preserve_range=True)
+                images[idx] = resize(
+                    img, output_shape=(self.H, self.W), preserve_range=True)
             else:
                 images[idx] = img
         return images
@@ -291,12 +309,12 @@ class DataManager(object):
 
     def savePose(self, id, pose):
         '''Saves pose'''
-        np.save(self.pose_file_template % id , pose)
+        np.save(self.pose_file_template % id, pose)
 
     def loadPoses(self, ids):
         '''Loads multiple poses'''
         num_poses = len(ids)
-        poses     = np.empty([num_poses, 6])
+        poses = np.empty([num_poses, 6])
         for idx in range(0, num_poses):
             poses[idx] = self.loadPose(ids[idx])
         return poses
@@ -319,8 +337,10 @@ class DataManager(object):
                     output array of pose_x - pose_y
         '''
         pose_diff = np.subtract(pose_x, pose_y)
-        pose_diff[..., 3:6] = np.arctan2(np.sin(pose_diff[..., 3:6]), np.cos(pose_diff[..., 3:6]))
+        pose_diff[..., 3:6] = np.arctan2(
+            np.sin(pose_diff[..., 3:6]), np.cos(pose_diff[..., 3:6]))
         return pose_diff
+
 
 import sys
 from argparse import ArgumentParser
@@ -329,11 +349,21 @@ from argparse import ArgumentParser
 def make_parser():
     '''Function returning parser is necessary for sphinx-argparse'''
     parser = ArgumentParser('Test class for data manager')
-    parser.add_argument('-d', '--dataset', type=str, required=True, help='Path to dataset folder')
-    parser.add_argument('-v', '--video', action='store_true', default=False,
-                        help='show image sequence with label information of training data')
+    parser.add_argument(
+        '-d',
+        '--dataset',
+        type=str,
+        required=True,
+        help='Path to dataset folder')
+    parser.add_argument(
+        '-v',
+        '--video',
+        action='store_true',
+        default=False,
+        help='show image sequence with label information of training data')
 
     return parser
+
 
 def main():
     import numpy as np
@@ -354,35 +384,34 @@ def main():
 
     image_shape = data_manager.getImageShape()
 
-
-    print("Number of images in training batches: " + str(data_manager.numTrainBatches() ) )
-    for images,labels in data_manager.batches():
+    print("Number of images in training batches: " +
+          str(data_manager.numTrainBatches()))
+    for images, labels in data_manager.batches():
 
         print(images.shape)
         print(labels.shape)
 
         if args.video:
 
-            f, axarr = plt.subplots(2,2)
-            axarr[0,0].imshow( images[0, 0, ..., :3])
-            axarr[0,0].set_title("First stack in sequence")
-            axarr[0,1].imshow( images[0, 0, ..., 3:])
-            axarr[0,1].set_title( str(labels[0, 0, ...]) )
-            axarr[1,0].imshow( images[0, -1, ..., :3])
-            axarr[1,0].set_title( "Last stack in sequence" )
-            axarr[1,1].imshow( images[0, -1, ..., 3:])
-            axarr[1,1].set_title( str(labels[0, -1, ...]) )
+            f, axarr = plt.subplots(2, 2)
+            axarr[0, 0].imshow(images[0, 0, ..., :3])
+            axarr[0, 0].set_title("First stack in sequence")
+            axarr[0, 1].imshow(images[0, 0, ..., 3:])
+            axarr[0, 1].set_title(str(labels[0, 0, ...]))
+            axarr[1, 0].imshow(images[0, -1, ..., :3])
+            axarr[1, 0].set_title("Last stack in sequence")
+            axarr[1, 1].imshow(images[0, -1, ..., 3:])
+            axarr[1, 1].set_title(str(labels[0, -1, ...]))
 
             plt.show()
 
-    print("Number of images in test batches: " + str(data_manager.numTestBatches() ) )
-    for images,labels in data_manager.test_batches():
+    print("Number of images in test batches: " +
+          str(data_manager.numTestBatches()))
+    for images, labels in data_manager.test_batches():
 
         print(images.shape)
         print(labels.shape)
 
 
-
 if __name__ == '__main__':
     main()
-

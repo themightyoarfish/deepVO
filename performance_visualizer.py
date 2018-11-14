@@ -5,15 +5,15 @@ import matplotlib
 import matplotlib.pyplot as plt
 from numpy import linalg as LA
 
-class PerformanceVisualizer(object):
 
+class PerformanceVisualizer(object):
     '''This class visualizes the performance of the network by plotting the percentage of the offset'''
 
     def __init__(self):
         super(PerformanceVisualizer, self).__init__()
         # contains 1 to n np.arrays that store the offset percentages for a single batch
         self.trans_diffs = []
-        self.rot_diffs   = []
+        self.rot_diffs = []
 
     def calculate_MSE_percentage(self, prediction_batch, label_batch):
         # Get the offset between prediction and labels
@@ -28,7 +28,7 @@ class PerformanceVisualizer(object):
         # Shift the batch by +1 in order to perform a pairwise subtraction next
         shifted_label_batch = np.roll(label_batch, 1, axis=1)
         # get diff between the points but ignore the first value as it is invalid bc of shifting
-        diff = (shifted_label_batch - label_batch)[:,1:,:]
+        diff = (shifted_label_batch - label_batch)[:, 1:, :]
         # calculate the norm2 of the differences in order to get all distances between succesive
         # points
         distances = LA.norm(diff, axis=2, ord=2)
@@ -41,10 +41,12 @@ class PerformanceVisualizer(object):
 
     # in model --> x: Label, y: Prediction
     def add_rotation_batch(self, prediction_batch, label_batch):
-        self.rot_diffs.append(self.calculate_MSE_percentage(prediction_batch, label_batch))
+        self.rot_diffs.append(
+            self.calculate_MSE_percentage(prediction_batch, label_batch))
 
     def add_translation_batch(self, prediction_batch, label_batch):
-        self.trans_diffs.append(self.calculate_MSE_percentage(prediction_batch, label_batch))
+        self.trans_diffs.append(
+            self.calculate_MSE_percentage(prediction_batch, label_batch))
 
     def plot(self, show=True):
         figure = plt.figure()
@@ -77,23 +79,23 @@ class PerformanceVisualizer(object):
 def main():
     # Generate two batches of results and test the visualizer
     # Batchsize=50, seqlength=10, posesize=6
-    batch_label  = np.zeros((50, 10, 6))
+    batch_label = np.zeros((50, 10, 6))
     batch_output = np.zeros((50, 10, 6))
     for b in range(50):
-        seq_label  = np.zeros((10, 6))
+        seq_label = np.zeros((10, 6))
         seq_output = np.zeros((10, 6))
         dev = 1 - b / 50
-        for i in range(1,10):
+        for i in range(1, 10):
             # imitate movement by adding random numbers
-            seq_label[i, :]  = seq_label[i-1, :] + np.random.randn(6)
+            seq_label[i, :] = seq_label[i - 1, :] + np.random.randn(6)
             seq_output[i, :] = seq_label[i, :] + np.random.randn(6) * dev
-        batch_label[b, :, :]  = seq_label
+        batch_label[b, :, :] = seq_label
         batch_output[b, :, :] = seq_output
 
     p = PerformanceVisualizer()
-    p.add_translation_batch(batch_output[:,:,:3], batch_label[:,:,:3])
+    p.add_translation_batch(batch_output[:, :, :3], batch_label[:, :, :3])
     # TODO: probably not correct data as it is rotational difference *think*
-    p.add_rotation_batch(batch_output[:,:,3:], batch_label[:,:,3:])
+    p.add_rotation_batch(batch_output[:, :, 3:], batch_label[:, :, 3:])
     p.plot()
 
 

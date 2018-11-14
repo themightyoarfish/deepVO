@@ -25,32 +25,80 @@ from matplotlib import pyplot as plt
 
 def make_parser():
     '''Function returning parser is necessary for sphinx-argparse'''
-    tf_optimizers = {class_name[:-len('Optimizer')] for class_name in dir(tf.train) if 'Optimizer'
-                     in class_name and class_name != 'Optimizer'}
+    tf_optimizers = {
+        class_name[:-len('Optimizer')]
+        for class_name in dir(tf.train)
+        if 'Optimizer' in class_name and class_name != 'Optimizer'
+    }
     parser = ArgumentParser('Train the DeepVO model')
-    parser.add_argument('-d', '--dataset', type=str, required=True, help='Path to dataset folder')
-    parser.add_argument('-o', '--optimizer', required=True, type=str,
-                        choices=tf_optimizers, help='Optimization algorithm')
-    parser.add_argument('-l', '--learning-rate', required=True, type=float,
-                        help='Learning rate for the optimizer')
-    parser.add_argument('-b', '--batch-size', required=True, type=int,
-                        help='Batch size')
-    parser.add_argument('-e', '--epochs', required=True, type=int,
-                        help='Number of epochs')
-    parser.add_argument('-f', '--flownet', required=False, type=str, default=None,
-                        help='Path to pretrained flownet weights')
-    parser.add_argument('-m', '--memory-size', required=True, type=int,
-                        help='Size of the lstm cell memory')
-    parser.add_argument('-s', '--sequence-length', required=True, type=int,
-                        help='Length of the sequences used for training the RNN.')
-    parser.add_argument('-r', '--use-dropout', action='store_true', default=False,
-                        help='Use dropout (during training)')
-    parser.add_argument('-v', '--visualize-displacement', action='store_true', default=False,
-                        help='Plot the percentage of translational and rotational displacement')
-    parser.add_argument('-w', '--width', type=int, required=False, default=0,
-                        help='Resize images to long edge')
-    parser.add_argument('-c', '--load-checkpoint', action='store_true', default=False,
-                        help='Load checkpoint from checkpoints/deepvo.ckpt')
+    parser.add_argument(
+        '-d',
+        '--dataset',
+        type=str,
+        required=True,
+        help='Path to dataset folder')
+    parser.add_argument(
+        '-o',
+        '--optimizer',
+        required=True,
+        type=str,
+        choices=tf_optimizers,
+        help='Optimization algorithm')
+    parser.add_argument(
+        '-l',
+        '--learning-rate',
+        required=True,
+        type=float,
+        help='Learning rate for the optimizer')
+    parser.add_argument(
+        '-b', '--batch-size', required=True, type=int, help='Batch size')
+    parser.add_argument(
+        '-e', '--epochs', required=True, type=int, help='Number of epochs')
+    parser.add_argument(
+        '-f',
+        '--flownet',
+        required=False,
+        type=str,
+        default=None,
+        help='Path to pretrained flownet weights')
+    parser.add_argument(
+        '-m',
+        '--memory-size',
+        required=True,
+        type=int,
+        help='Size of the lstm cell memory')
+    parser.add_argument(
+        '-s',
+        '--sequence-length',
+        required=True,
+        type=int,
+        help='Length of the sequences used for training the RNN.')
+    parser.add_argument(
+        '-r',
+        '--use-dropout',
+        action='store_true',
+        default=False,
+        help='Use dropout (during training)')
+    parser.add_argument(
+        '-v',
+        '--visualize-displacement',
+        action='store_true',
+        default=False,
+        help='Plot the percentage of translational and rotational displacement'
+    )
+    parser.add_argument(
+        '-w',
+        '--width',
+        type=int,
+        required=False,
+        default=0,
+        help='Resize images to long edge')
+    parser.add_argument(
+        '-c',
+        '--load-checkpoint',
+        action='store_true',
+        default=False,
+        help='Load checkpoint from checkpoints/deepvo.ckpt')
     return parser
 
 
@@ -72,13 +120,15 @@ def main():
     image_shape = data_manager.getImageShape()
 
     # create model
-    optimizer_spec = OptimizerSpec(kind=args.optimizer, learning_rate=args.learning_rate)
-    model = VOModel(image_shape,
-                    args.memory_size,
-                    args.sequence_length,
-                    optimizer_spec=optimizer_spec,
-                    use_dropout=args.use_dropout,
-                    use_flownet=args.flownet is not None)
+    optimizer_spec = OptimizerSpec(
+        kind=args.optimizer, learning_rate=args.learning_rate)
+    model = VOModel(
+        image_shape,
+        args.memory_size,
+        args.sequence_length,
+        optimizer_spec=optimizer_spec,
+        use_dropout=args.use_dropout,
+        use_flownet=args.flownet is not None)
 
     saver = tf.train.Saver()
 
@@ -109,7 +159,8 @@ def main():
             # reset state after each batch of consecutive sequences
             states = None
             for images, poses in data_manager.batches():
-                _, _, states = model.train(session, images, poses, initial_states=states)
+                _, _, states = model.train(
+                    session, images, poses, initial_states=states)
 
             # test on test set. We can't push it thorugh the net at once, so be use batches and
             # compute average loss
@@ -117,7 +168,8 @@ def main():
             count = 0
             states = None
             for images, poses in data_manager.test_batches():
-                y_t, y_r, _loss, states = model.test(session, images, poses, initial_states=states)
+                y_t, y_r, _loss, states = model.test(
+                    session, images, poses, initial_states=states)
                 avg_loss += _loss
                 count += 1
 
@@ -130,7 +182,8 @@ def main():
                 save_path = saver.save(session, model_filename)
                 print(f'Model saved in file: {model_filename}')
 
-            print(f'Average test loss across {count} batches: {avg_loss:04.5f}')
+            print(
+                f'Average test loss across {count} batches: {avg_loss:04.5f}')
 
             data_manager.shuffleBatches()
 

@@ -8,15 +8,15 @@ Contains the :py:class:`SequenceVisualizer` to visualise trajectory
 import numpy as np
 import matplotlib.pyplot as plt
 
-class SequenceVisualizer(object):
 
+class SequenceVisualizer(object):
     '''This class visualizes the output of the network'''
 
     def __init__(self):
         super(SequenceVisualizer, self).__init__()
         # Define initial position to be (0,0)
-        self.outputs  = []
-        self.labels   = []
+        self.outputs = []
+        self.labels = []
         self.position = 0
         self.reset_plot()
 
@@ -31,11 +31,11 @@ class SequenceVisualizer(object):
 
         # Extract only the relevant data the has not yet been plotted
         output_to_plot = np.asarray(self.outputs[self.position:])
-        label_to_plot  = np.asarray(self.labels[self.position:])
+        label_to_plot = np.asarray(self.labels[self.position:])
 
         # Only plot the positions
         output_to_plot = output_to_plot[:, :2]
-        label_to_plot  = label_to_plot[:, :2]
+        label_to_plot = label_to_plot[:, :2]
 
         # Update the data pointer
         self.position = len(self.outputs)
@@ -62,7 +62,7 @@ def main():
     for i in range(20):
         # imitate movement by adding random numbers
         label += np.random.randn(6)
-        output = label + np.random.randn(6)*0.5
+        output = label + np.random.randn(6) * 0.5
 
         # slightly change the output from the groundtruth position
         vis.add_data(output, label)
@@ -71,7 +71,7 @@ def main():
     for i in range(20):
         # imitate movement by adding random numbers
         label += np.random.randn(6)
-        output = label + np.random.randn(6)*0.1
+        output = label + np.random.randn(6) * 0.1
 
         # slightly change the output from the groundtruth position
         vis.add_data(output, label)

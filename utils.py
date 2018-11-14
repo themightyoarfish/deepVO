@@ -39,11 +39,11 @@ def tensor_from_lstm_tuple(tuples, validate_shape=False):
     '''
     import tensorflow as tf
     # one state tuple has two members of shape (batch_size, memory_size)
-    N_lstm      = len(tuples)
-    batch_size  = tuples[0].c.shape[0]
+    N_lstm = len(tuples)
+    batch_size = tuples[0].c.shape[0]
     memory_size = tuples[0].c.shape[1]
     # return value. Since we don't know the dimensions upfront, make it a list instead of an array
-    list_array  = [[None, None]] * N_lstm
+    list_array = [[None, None]] * N_lstm
     # explanation: see at return
     states_are_tensors = False
 
@@ -53,12 +53,14 @@ def tensor_from_lstm_tuple(tuples, validate_shape=False):
         # check for incompatible shapes
         if validate_shape:
             # all dims must match
-            if not ((batch_size, memory_size) == lstm_state.c.shape == lstm_state.h.shape):
+            if not ((batch_size, memory_size) == lstm_state.c.shape ==
+                    lstm_state.h.shape):
                 raise ValueError('All states must have the same dimenstion.')
         else:
             # only the memory_size must match, batch_size is assumed to match, but cannot be
             # verified
-            if not (memory_size == lstm_state.c.shape[1] == lstm_state.h.shape[1]):
+            if not (memory_size == lstm_state.c.shape[1] ==
+                    lstm_state.h.shape[1]):
                 raise ValueError('All states must have the same memory size.')
 
         if isinstance(lstm_state.c, tf.Tensor):
@@ -144,8 +146,10 @@ def resize_to_multiple(images, multiples):
     # if only one multiple, assume it's the value to use for all dims
     if not isinstance(multiples, tuple):
         multiples = (multiples, multiples)
-    new_h, new_w = [int(ceil(input_shape[0] / multiples[0])),
-                    int(ceil(input_shape[1] / multiples[1]))]
+    new_h, new_w = [
+        int(ceil(input_shape[0] / multiples[0])),
+        int(ceil(input_shape[1] / multiples[1]))
+    ]
     return resize_images(images, [new_h, new_w])
 
 
@@ -232,7 +236,8 @@ def convert_large_array(file_in, file_out, dtype, factor=1.0):
                 Scaling factor to apply to all elements
     '''
     source = np.lib.format.open_memmap(file_in, mode='r')
-    dest = np.lib.format.open_memmap(file_out, mode='w+', dtype=dtype, shape=source.shape)
+    dest = np.lib.format.open_memmap(
+        file_out, mode='w+', dtype=dtype, shape=source.shape)
     np.copyto(dest, source, casting='unsafe')
     if factor != 1.0:
         np.multiply(dest, factor, out=dest)
@@ -251,10 +256,13 @@ def subtract_poses(pose_x, pose_y):
                 output array of pose_x - pose_y
     '''
     pose_diff = np.subtract(pose_x, pose_y)
-    pose_diff[..., 3:6] = np.arctan2(np.sin(pose_diff[..., 3:6]), np.cos(pose_diff[..., 3:6]))
+    pose_diff[..., 3:6] = np.arctan2(
+        np.sin(pose_diff[..., 3:6]), np.cos(pose_diff[..., 3:6]))
     return pose_diff
 
+
 from skimage.transform import resize
+
 
 class OptimizerSpec(dict):
     '''Encapsulate all the info needed for creating any kind of optimizer. Learning rate scheduling
@@ -295,14 +303,16 @@ class OptimizerSpec(dict):
             raise ValueError('No base learning_rate given')
         self.update(kwargs)
         import tensorflow as tf
-        self.step_counter  = tf.Variable(0, trainable=False, dtype=tf.int32, name='step_counter')
-        rate               = kwargs['learning_rate']
+        self.step_counter = tf.Variable(
+            0, trainable=False, dtype=tf.int32, name='step_counter')
+        rate = kwargs['learning_rate']
         # use exponential_decay
         if 'steps' in kwargs and 'decay' in kwargs:
-            steps              = kwargs.get('steps')
-            decay              = kwargs.get('decay')
-            self.learning_rate = tf.train.exponential_decay(rate, self.step_counter, steps, decay)
-        else:   # plain learning
+            steps = kwargs.get('steps')
+            decay = kwargs.get('decay')
+            self.learning_rate = tf.train.exponential_decay(
+                rate, self.step_counter, steps, decay)
+        else:  # plain learning
             self.learning_rate = rate
 
     def create(self):
@@ -313,22 +323,24 @@ class OptimizerSpec(dict):
         tf.train.Optimizer
             Ready-made optimizer
         '''
-        kind          = self['kind']
+        kind = self['kind']
         learning_rate = self.learning_rate
-        name          = self.get('name', 'optimizer')
+        name = self.get('name', 'optimizer')
         optimizer_cls = OptimizerSpec.get_optimizer(kind)
         if kind in ['Momentum', 'RMSProp']:
             # only those two use momentum param
             try:
                 momentum = self['momentum']
             except KeyError:
-                raise ValueError('Momentum parameter is necessary for MomentumOptimizer')
+                raise ValueError(
+                    'Momentum parameter is necessary for MomentumOptimizer')
             if kind == 'Momentum':
                 if 'use_nesterov' in self:
                     use_nesterov = self['use_nesterov']
                 else:
                     use_nesterov = False
-                return optimizer_cls(learning_rate, momentum, use_nesterov, name=name)
+                return optimizer_cls(
+                    learning_rate, momentum, use_nesterov, name=name)
             else:
                 return optimizer_cls(learning_rate, momentum, name=name)
         else:
@@ -347,9 +359,17 @@ class OptimizerSpec(dict):
             return getattr(tf.train, name + 'Optimizer')
 
 
-def conv_layer(input, channels_out, kernel_width, strides, activation, kernel_initializer,
-               bias_initializer, use_bias=True, padding='SAME',
-               var_names=(None, None), trainable=True):
+def conv_layer(input,
+               channels_out,
+               kernel_width,
+               strides,
+               activation,
+               kernel_initializer,
+               bias_initializer,
+               use_bias=True,
+               padding='SAME',
+               var_names=(None, None),
+               trainable=True):
     '''Create a convolutional layer with activation function and variable
     initialisation.
 
@@ -386,17 +406,19 @@ def conv_layer(input, channels_out, kernel_width, strides, activation, kernel_in
     _, h, w, channels_in = input.shape
     if isinstance(strides, int):
         strides = (1, strides, strides, 1)
-    kernels = tf.get_variable(shape=(kernel_width, kernel_width, channels_in, channels_out),
-                              initializer=kernel_initializer, name=kernel_name, trainable=trainable)
+    kernels = tf.get_variable(
+        shape=(kernel_width, kernel_width, channels_in, channels_out),
+        initializer=kernel_initializer,
+        name=kernel_name,
+        trainable=trainable)
     if use_bias:
-        bias_shape = (channels_out,)
-        biases = tf.get_variable(shape=bias_shape, initializer=bias_initializer, name=bias_name,
-                                 trainable=trainable)
-    conv = tf.nn.conv2d(
-        input,
-        kernels,
-        strides,
-        padding=padding)
+        bias_shape = (channels_out, )
+        biases = tf.get_variable(
+            shape=bias_shape,
+            initializer=bias_initializer,
+            name=bias_name,
+            trainable=trainable)
+    conv = tf.nn.conv2d(input, kernels, strides, padding=padding)
     if use_bias:
         return activation(conv + biases)
     else:
