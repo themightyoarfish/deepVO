@@ -15,7 +15,7 @@ In order to make use of the full 720 resolution of the LifeCam 3000, you must do
 ## Data Preprocessing
 ### Bagfile conversion
 The first thing to do is to convert the rosbag sensor recordings with the
-conversion tool lik this
+conversion tool (which you can find [here](https://github.com/themightyoarfish/bag_to_pose_cam_data)) like this
 ```
 bag_to_cam_pose_data -b <file>.bag  -d <outdir> -x -P
 ```
